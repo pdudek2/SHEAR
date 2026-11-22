@@ -20,6 +20,7 @@ import { clearWorkoutDeleteRecovery, readWorkoutDeleteRecovery, writeWorkoutDele
 import { confirmedQuery } from './confirmedQuery'
 import { parseCompressionRecord, parseGroup, type CompressionRecord } from '../shared/compressionRecord'
 import { countsTowardVolume } from '../shared/progress'
+import { startOfWeek } from '../shared/week'
 
 interface WorkoutSetSummary {
   weight: number
@@ -208,10 +209,8 @@ export async function retryPendingMaterializations(
 }
 
 export function countWeeklyWorkouts(workouts: WorkoutSummary[]): number {
-  const startOfWeek = new Date()
-  startOfWeek.setHours(0, 0, 0, 0)
-  startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7))
-  return workouts.filter((workout) => workout.startedAt >= startOfWeek.getTime()).length
+  const weekStart = startOfWeek(new Date()).getTime()
+  return workouts.filter((workout) => workout.startedAt >= weekStart).length
 }
 
 export { calcStreak } from '../shared/streak'

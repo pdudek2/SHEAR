@@ -11,10 +11,16 @@ export function addLocalDays(date: Date, days: number): Date {
   return next
 }
 
-export function getWeekDates(now: Date): Date[] {
-  const monday = new Date(now)
-  monday.setHours(0, 0, 0, 0)
+export function startOfWeek(date: Date): Date {
+  const monday = new Date(date)
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+  // Midnight comes last: where DST skips midnight, setting it first leaves Monday at 01:00.
+  monday.setHours(0, 0, 0, 0)
+  return monday
+}
+
+export function getWeekDates(now: Date): Date[] {
+  const monday = startOfWeek(now)
   return Array.from({ length: 7 }, (_, index) => addLocalDays(monday, index))
 }
 

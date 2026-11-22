@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { formatBestSet, formatCountChange, formatPercentChange, formatSetChange, progressExtras, summarizeAllExercises, type ProgressSessionLite } from '../progress'
+import { getWeekDates } from '../week'
 
 const at = (date: string) => new Date(`${date}T18:00:00`).getTime()
 // Wednesday; with 30 days the full weeks are those starting Oct 26, Nov 2 and Nov 9.
@@ -102,6 +103,20 @@ describe('summarizeAllExercises', () => {
   it('gives no change with fewer than two full weeks before the range', () => {
     const late = sessions.filter(({ finishedAt }) => finishedAt >= at('2026-10-20'))
     expect(summarizeAllExercises(late, 30, anchor).averageDelta).toBeNull()
+  })
+})
+
+describe('weeks in a time zone that skips midnight', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('keeps the Sunday of the change in its week on Progress and Home', () => {
+    vi.stubEnv('TZ', 'America/Santiago')
+    const dates = ['2026-08-25', '2026-09-06', '2026-09-08']
+    const squats = dates.map((date, index) => session({ workoutId: `t${index}`, exerciseId: 'squat', finishedAt: at(date), totalVolume: 3000 }))
+    expect(summarizeAllExercises(squats, 30, at('2026-09-16')).weeks.map(({ volume }) => volume)).toEqual([3000, 3000, 3000, 0])
+    expect(getWeekDates(new Date(at('2026-09-06')))[0]).toEqual(new Date('2026-08-31T00:00:00'))
   })
 })
 

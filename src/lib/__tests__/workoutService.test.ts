@@ -12,6 +12,7 @@ vi.mock('firebase/firestore', () => ({}))
 
 import {
   calcStreak,
+  countWeeklyWorkouts,
   deleteWorkout,
   retryPendingMaterializations,
   retryWorkoutMaterialization,
@@ -85,6 +86,20 @@ describe('calcStreak', () => {
       workoutDaysAgo(1),
     ]
     expect(calcStreak(workouts)).toBe(2)
+  })
+})
+
+describe('countWeeklyWorkouts', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllEnvs()
+  })
+
+  it('starts the week at Monday 00:00 when today has no midnight', () => {
+    vi.stubEnv('TZ', 'America/Santiago')
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-06T12:00:00') })
+    const monday = { startedAt: new Date('2026-08-31T00:30:00').getTime() } as WorkoutSummary
+    expect(countWeeklyWorkouts([monday])).toBe(1)
   })
 })
 

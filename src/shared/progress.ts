@@ -1,6 +1,6 @@
 import { exercises, type Category } from '../../data/exercises'
 import { kgToDisplayWeight, type WeightUnits } from './weightUnits'
-import { addLocalDays } from './week'
+import { addLocalDays, startOfWeek } from './week'
 
 export const PROGRESS_MUSCLE_LABELS: Record<string, string> = {
   chest: 'Chest', back: 'Back', shoulders: 'Shoulders', biceps: 'Biceps', triceps: 'Triceps', quads: 'Quads',
@@ -45,15 +45,6 @@ export interface ProgressSessionsResult {
 export interface ProgressRecordsResult {
   records: RecordSummary[]
   truncated: boolean
-}
-
-// Monday 00:00:00.000 local dla danej daty
-function getWeekMonday(date: Date): Date {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  const day = d.getDay()
-  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
-  return d
 }
 
 function calcDelta(current: number, previous: number): number {
@@ -160,7 +151,7 @@ function better(a: BestSet, b: BestSet, assisted: boolean): boolean {
 }
 
 function mondayOf(ms: number): number {
-  return getWeekMonday(new Date(ms)).getTime()
+  return startOfWeek(new Date(ms)).getTime()
 }
 
 export function summarizeAllExercises(sessions: ProgressSessionLite[], rangeDays: number, anchorMs = Date.now()): AllExercisesSummary {
