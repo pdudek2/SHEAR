@@ -83,10 +83,10 @@ function Chart({ values, labels, units, width, kind, summary, onInspect, average
   </View>
 }
 
-export function WeeklyVolumeChart({ weeks, average, units, width }: { weeks: SummaryWeek[]; average: number | null; units: WeightUnits; width: number }) {
+export function WeeklyVolumeChart({ weeks, trainingWeeks, average, units, width }: { weeks: SummaryWeek[]; trainingWeeks: number; average: number | null; units: WeightUnits; width: number }) {
   const full = weeks.filter((week) => !week.current)
-  const averageText = average === null ? 'No full week yet.' : `Average ${formatCompactVolume(average, units)} per full week.`
-  return <Chart values={weeks.map((week) => week.volume)} labels={weeks.map((week) => week.weekLabel)} average={average} units={units} width={width} kind="volume" summary={`Weekly volume, ${full.length} full ${full.length === 1 ? 'week' : 'weeks'}. ${averageText} This week so far ${formatCompactVolume(weeks.at(-1)?.volume ?? 0, units)}.`} />
+  const averageText = average === null ? 'No average yet.' : `Average ${formatCompactVolume(average, units)} per training week.`
+  return <Chart values={weeks.map((week) => week.volume)} labels={weeks.map((week) => week.weekLabel)} average={average} units={units} width={width} kind="volume" summary={`Weekly volume, ${full.length} full ${full.length === 1 ? 'week' : 'weeks'}, ${trainingWeeks} with training. ${averageText} This week so far ${formatCompactVolume(weeks.at(-1)?.volume ?? 0, units)}.`} />
 }
 
 export function StrengthChart({ points, keyName, units, width, onInspect }: { points: StrengthPoint[]; keyName: string; units: WeightUnits; width: number; onInspect: (index: number) => void }) {

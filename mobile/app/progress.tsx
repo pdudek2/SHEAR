@@ -9,7 +9,7 @@ import { pluralize } from '../../src/lib/pluralize'
 import { formatRoundedVolume, kgToDisplayWeight } from '../../src/shared/weightUnits'
 import {
   aggregateStrengthProgression, defaultStrengthKey, formatBestSet, formatCountChange, formatPercentChange, formatSetChange,
-  previousPeriodLabel, strengthDeltaLabel, summarizeAllExercises, type ProgressSessionLite,
+  previousPeriodLabel, strengthDeltaLabel, formatAverageBasis, summarizeAllExercises, type ProgressSessionLite,
 } from '../../src/shared/progress'
 import HistoryHeader from '../src/HistoryHeader'
 import { MuscleBars, StrengthChart, WeeklyVolumeChart } from '../src/ProgressCharts'
@@ -86,7 +86,6 @@ function ProgressContent({ uid }: { uid: string }) {
     ...(sessionsStale ? ['Could not refresh workout data.'] : []),
     ...(coverage && snapshot?.sessions?.truncated ? ['Workout analytics include the 5,000 most recent entries.'] : []),
   ]
-  const headlineVolume = summary.averageVolume ?? summary.weeks.at(-1)?.volume ?? 0
   const chartExercise = (key: string) => {
     setStrengthKey(key)
     scroll.current?.scrollTo({ y: Math.max(0, chartY.current.analysis + chartY.current.panel - 12) })
@@ -111,21 +110,21 @@ function ProgressContent({ uid }: { uid: string }) {
       {coverage && currentSessions.length > 0 && <View onLayout={(event) => { chartY.current.analysis = event.nativeEvent.layout.y }} style={styles.analysis}>
         <View accessibilityLabel="All exercises">
           <View style={styles.heroRow}>
-            <Text accessibilityRole="header" style={styles.heroLabel}><Text style={styles.heroStrong}>All exercises</Text> · {summary.averageVolume === null ? 'this week so far' : 'average of full weeks'}</Text>
+            <Text accessibilityRole="header" style={styles.heroLabel}><Text style={styles.heroStrong}>All exercises</Text> · {formatAverageBasis(summary)}</Text>
             <Text style={styles.heroLabel}>Workouts</Text>
           </View>
           <View style={styles.heroRow}>
-            <Text numberOfLines={1} style={styles.heroValue}>{formatRoundedVolume(headlineVolume, units)}<Text style={styles.heroUnit}> {units}{summary.averageVolume === null ? '' : ' / week'}</Text></Text>
+            <Text numberOfLines={1} style={styles.heroValue}>{summary.headlineVolume === null ? '—' : <>{formatRoundedVolume(summary.headlineVolume, units)}<Text style={styles.heroUnit}> {units}{summary.averageVolume === null ? '' : ' / week'}</Text></>}</Text>
             <Text style={styles.heroCount}>{summary.workouts}</Text>
           </View>
           {summary.comparable && <View style={[styles.heroRow, styles.heroDeltaRow]}>
             <Text style={styles.heroLabel}>{summary.averageDelta !== null && <><Text style={styles.heroStrong}>{formatPercentChange(summary.averageDelta)}</Text> vs {previousPeriodLabel(rangeDays)}</>}</Text>
             <Text style={[styles.heroLabel, styles.heroStrong]}>{formatCountChange(summary.workouts - summary.previousWorkouts)}</Text>
           </View>}
-          <View style={styles.weekly}><WeeklyVolumeChart weeks={summary.weeks} average={summary.averageVolume} units={units} width={chartWidth} /></View>
+          <View style={styles.weekly}><WeeklyVolumeChart weeks={summary.weeks} trainingWeeks={summary.trainingWeeks} average={summary.averageVolume} units={units} width={chartWidth} /></View>
         </View>
         {summary.muscles.length > 0 && <View>
-          <View style={styles.panelHead}><Text accessibilityRole="header" style={styles.panelTitle}>Sets per muscle group</Text><Text style={styles.panelBadge}>{summary.muscleBasis === 'average' ? 'avg / week' : 'this week'}</Text></View>
+          <View style={styles.panelHead}><Text accessibilityRole="header" style={styles.panelTitle}>Sets per muscle group</Text><Text style={styles.panelBadge}>{summary.muscleBasis === 'average' ? 'avg / training week' : 'this week'}</Text></View>
           <MuscleBars points={summary.muscles} />
           <Text style={styles.note}>Assisting muscles count half.</Text>
         </View>}

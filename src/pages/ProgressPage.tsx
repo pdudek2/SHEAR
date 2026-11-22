@@ -22,6 +22,7 @@ import {
   strengthChartScale,
   strengthDeltaLabel,
   summarizeAllExercises,
+  formatAverageBasis,
   PROGRESS_MUSCLE_LABELS as MUSCLE_LABELS,
   type ProgressSessionLite,
   type RecordSummary,
@@ -43,11 +44,11 @@ const RANGE_OPTIONS = [
 const EMPTY_SESSIONS: ProgressSessionLite[] = []
 const EMPTY_RECORDS: RecordSummary[] = []
 
-function summarizeWeeklyVolume(weeks: SummaryWeek[], average: number | null, units: Units): string {
+function summarizeWeeklyVolume(weeks: SummaryWeek[], trainingWeeks: number, average: number | null, units: Units): string {
   const current = weeks.at(-1)
   const full = weeks.filter((week) => !week.current)
-  const averageText = average === null ? 'No full week yet.' : `Average ${formatVolume(average, units)} per full week.`
-  return `Weekly volume, ${full.length} full ${pluralize(full.length, 'week', 'weeks')}. ${averageText} This week so far ${formatVolume(current?.volume ?? 0, units)}.`
+  const averageText = average === null ? 'No average yet.' : `Average ${formatVolume(average, units)} per training week.`
+  return `Weekly volume, ${full.length} full ${pluralize(full.length, 'week', 'weeks')}, ${trainingWeeks} with training. ${averageText} This week so far ${formatVolume(current?.volume ?? 0, units)}.`
 }
 
 function summarizeStrengthProgression(data: StrengthPoint[], series: StrengthSeries[], units: Units): string {
@@ -317,7 +318,6 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
     limitNotices.push('Workout analytics include the 5,000 most recent entries.')
   }
   const issues = [...retryableIssues, ...limitNotices]
-  const headlineVolume = summary.averageVolume ?? summary.weeks.at(-1)?.volume ?? 0
   const topMuscleSets = summary.muscles[0]?.sets || 1
 
   return (
@@ -387,11 +387,15 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
             <section className="progress-overview" aria-label="All exercises">
               <div className="progress-hero">
                 <p className="progress-hero-label">
-                  <b>All exercises</b> · {summary.averageVolume === null ? 'this week so far' : 'average of full weeks'}
+                  <b>All exercises</b> · {formatAverageBasis(summary)}
                 </p>
                 <p className="progress-hero-value">
-                  {formatRoundedVolume(headlineVolume, units)}
-                  <small>{units}{summary.averageVolume === null ? '' : ' / week'}</small>
+                  {summary.headlineVolume === null ? '—' : (
+                    <>
+                      {formatRoundedVolume(summary.headlineVolume, units)}
+                      <small>{units}{summary.averageVolume === null ? '' : ' / week'}</small>
+                    </>
+                  )}
                 </p>
                 {summary.comparable && (
                   <p className="progress-hero-delta">
@@ -406,14 +410,14 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
                   </p>
                 )}
               </div>
-              <WeeklyVolumeChart weeks={summary.weeks} average={summary.averageVolume} units={units} />
+              <WeeklyVolumeChart weeks={summary.weeks} trainingWeeks={summary.trainingWeeks} average={summary.averageVolume} units={units} />
             </section>
 
             {summary.muscles.length > 0 && (
               <section className="progress-muscles">
                 <div className="progress-section-head">
                   <h2>Sets per muscle group</h2>
-                  <span>{summary.muscleBasis === 'average' ? 'avg / week' : 'this week'}</span>
+                  <span>{summary.muscleBasis === 'average' ? 'avg / training week' : 'this week'}</span>
                 </div>
                 <div className="progress-muscle-list">
                   {summary.muscles.map(({ muscle, sets }) => (
@@ -589,7 +593,7 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
   )
 }
 
-function WeeklyVolumeChart({ weeks, average, units }: { weeks: SummaryWeek[]; average: number | null; units: Units }) {
+function WeeklyVolumeChart({ weeks, trainingWeeks, average, units }: { weeks: SummaryWeek[]; trainingWeeks: number; average: number | null; units: Units }) {
   const data = weeks.map((week) => ({ ...week, axisLabel: week.current ? 'so far' : week.weekLabel }))
   const currentIndex = weeks.findIndex(({ current }) => current)
   // Axis values next to the average label would collide with it.
@@ -597,7 +601,7 @@ function WeeklyVolumeChart({ weeks, average, units }: { weeks: SummaryWeek[]; av
     ? ''
     : formatShortVolume(value, units)
   return (
-    <div className="progress-chart-frame progress-chart-frame--volume" role="img" aria-label={summarizeWeeklyVolume(weeks, average, units)}>
+    <div className="progress-chart-frame progress-chart-frame--volume" role="img" aria-label={summarizeWeeklyVolume(weeks, trainingWeeks, average, units)}>
       <ResponsiveContainer width="100%" aspect={2.6} maxHeight={240} minWidth={1} initialDimension={{ width: 1, height: 1 }}>
         <BarChart data={data} margin={{ top: 22, right: 0, left: 0, bottom: 0 }} barCategoryGap="30%">
           <CartesianGrid stroke="rgba(244,238,232,0.1)" vertical={false} />

@@ -208,7 +208,7 @@ describe('ProgressPage', () => {
     await screen.findByRole('region', { name: 'All exercises' })
     const expected = summarizeAllExercises(sessions, 90, NOW)
     expect(expected.averageVolume).not.toBeNull()
-    expect(heroText()).toContain('average of full weeks')
+    expect(heroText()).toMatch(/average of \d+ training weeks/)
     expect(heroText()).toContain('kg / week')
     expect(workoutCount()).toBe(String(expected.workouts))
 
@@ -220,6 +220,38 @@ describe('ProgressPage', () => {
       expect(expected.averageDelta).toBeNull()
       expect(heroText()).not.toContain('vs previous')
     }
+  })
+
+  it('averages the training week after a break and says so to a screen reader', async () => {
+    const sessions = [session('back', 10, { totalVolume: 9_000 }), ...Array.from({ length: 10 }, (_, index) => session(`before-${index}`, 101 + 7 * index, { totalVolume: 9_000 }))]
+    mockLoadProgressData.mockResolvedValue(successfulLoad({ sessions }))
+    render(<ProgressPage />)
+
+    await screen.findByRole('region', { name: 'All exercises' })
+    expect(heroText()).toContain('average of 1 training week')
+    expect(heroText()).toContain('9,000kg / week')
+    expect(heroText()).not.toContain('vs previous')
+    expect(heroText()).toContain('Workouts1−9')
+    expect(screen.getByRole('img', { name: /Weekly volume/ })).toHaveAccessibleName(/12 full weeks, 1 with training\. Average .* per training week\./)
+    expect(screen.getByText('avg / training week')).toBeInTheDocument()
+  })
+
+  it('keeps the workout change when there is no volume to compare', async () => {
+    const sessions = Array.from({ length: 20 }, (_, index) => session(`body-${index}`, 1 + 7 * index, { totalVolume: 0 }))
+    mockLoadProgressData.mockResolvedValue(successfulLoad({ sessions }))
+    render(<ProgressPage />)
+
+    await screen.findByRole('region', { name: 'All exercises' })
+    expect(heroText()).not.toContain('vs previous')
+    expect(heroText()).toContain('Workouts13+6')
+  })
+
+  it('shows a dash instead of zero without a full training week', async () => {
+    mockLoadProgressData.mockResolvedValue(successfulLoad({ sessions: [session('edge', 89)] }))
+    render(<ProgressPage />)
+
+    await screen.findByRole('region', { name: 'All exercises' })
+    expect(heroText()).toContain('no full training week—Workouts1')
   })
 
   it('presents the weekly volume, best sets and strength in lbs while retaining kg chart data', async () => {

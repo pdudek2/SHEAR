@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { formatBestSet, formatCountChange, formatPercentChange, formatSetChange, progressExtras, summarizeAllExercises, workoutVolume, type ProgressSessionLite } from '../progress'
+import { formatAverageBasis, formatBestSet, formatCountChange, formatPercentChange, formatSetChange, progressExtras, summarizeAllExercises, workoutVolume, type ProgressSessionLite } from '../progress'
 import { getWeekDates } from '../week'
 
 const at = (date: string) => new Date(`${date}T18:00:00`).getTime()
@@ -31,7 +31,7 @@ describe('summarizeAllExercises', () => {
 
   it('averages full weeks without assisted volume and draws the current week apart', () => {
     expect(summary.weeks.map(({ volume, current }) => [volume, current])).toEqual([[600, false], [2000, false], [2400, false], [1500, true]])
-    expect(summary.fullWeeks).toBe(3)
+    expect(summary.trainingWeeks).toBe(3)
     expect(summary.averageVolume).toBeCloseTo(5000 / 3)
     // The full weeks before the range since the first workout: Oct 5 (assisted only, 0) and Oct 12 (2000).
     // Oct 19 straddles the range start, so it belongs to neither period.
@@ -54,7 +54,7 @@ describe('summarizeAllExercises', () => {
     expect([summary.comparable, summary.averageDelta, summary.workouts, summary.previousWorkouts]).toEqual([true, null, 2, 4])
   })
 
-  it('counts sets per muscle per full week, the first muscle whole and the others half, without cardio', () => {
+  it('counts sets per muscle per training week, the first muscle whole and the others half, without cardio', () => {
     expect(summary.muscleBasis).toBe('average')
     expect(Object.fromEntries(summary.muscles.map(({ muscle, sets }) => [muscle, Math.round(sets * 1000) / 1000]))).toEqual({
       quads: 2.667, glutes: 2.333, back: 2, biceps: 1, hamstrings: 0.5,
@@ -106,6 +106,50 @@ describe('summarizeAllExercises', () => {
   })
 })
 
+describe('averages over the weeks with training', () => {
+  const squat = (date: string, totalVolume = 9000) => session({ workoutId: date, exerciseId: 'squat', finishedAt: at(date), totalVolume, totalSets: 12, category: 'legs' })
+  const run = (date: string) => session({ workoutId: date, exerciseId: 'treadmill', finishedAt: at(date), totalSets: 1, category: 'cardio' })
+  const before = ['05-26', '06-02', '06-09', '06-16', '06-23', '06-30', '07-07', '07-14', '07-21', '07-28', '08-04', '08-11'].map((date) => squat(`2026-${date}`))
+
+  it('does not spread the return from a break over the weeks away', () => {
+    const back = summarizeAllExercises([...before, squat('2026-11-10')], 90, anchor)
+    expect([back.averageVolume, back.headlineVolume, back.trainingWeeks, back.averageDelta]).toEqual([9000, 9000, 1, null])
+    expect(back.weeks).toHaveLength(13)
+    expect(back.muscles[0]).toEqual({ muscle: 'quads', sets: 12 })
+    expect(formatAverageBasis(back)).toBe('average of 1 training week')
+    // The workout count still compares calendar periods.
+    expect([back.comparable, back.workouts, back.previousWorkouts]).toEqual([true, 1, 12])
+
+    const later = summarizeAllExercises([...before, squat('2026-11-03'), squat('2026-11-10')], 90, anchor)
+    expect([later.trainingWeeks, later.averageDelta, formatAverageBasis(later)]).toEqual([2, 0, 'average of 2 training weeks'])
+  })
+
+  it('shows this week on the week of the return', () => {
+    const back = summarizeAllExercises([...before, squat('2026-11-17', 6000)], 90, anchor)
+    expect([back.averageVolume, back.headlineVolume, back.averageDelta, back.comparable, back.muscleBasis]).toEqual([null, 6000, null, true, 'thisWeek'])
+    expect(formatAverageBasis(back)).toBe('this week so far')
+  })
+
+  it('has no headline without a training week to show', () => {
+    for (const only of [squat('2026-10-20'), run('2026-11-17')]) {
+      const none = summarizeAllExercises([only], 30, anchor)
+      expect([none.headlineVolume, formatAverageBasis(none)]).toEqual([null, 'no full training week'])
+    }
+  })
+
+  it('leaves cardio-only weeks out and keeps bodyweight weeks', () => {
+    const lifts = [squat('2026-10-27'), squat('2026-11-10')]
+    expect(summarizeAllExercises([...lifts, run('2026-11-03')], 30, anchor)).toMatchObject({ trainingWeeks: 2, averageVolume: 9000 })
+    const bodyweight = session({ workoutId: 'body', exerciseId: 'pull-up', finishedAt: at('2026-11-03'), category: 'back' })
+    expect(summarizeAllExercises([...lifts, bodyweight], 30, anchor)).toMatchObject({ trainingWeeks: 3, averageVolume: 6000 })
+  })
+
+  it('reads the same from a longer load as from twice the range', () => {
+    const recent = [squat('2026-11-03'), squat('2026-11-10')]
+    expect(summarizeAllExercises([...before, ...recent], 30, anchor)).toEqual(summarizeAllExercises(recent, 30, anchor))
+  })
+})
+
 describe('weeks in a time zone that skips midnight', () => {
   afterEach(() => {
     vi.unstubAllEnvs()
@@ -132,8 +176,10 @@ describe('workoutVolume', () => {
 
 describe('progressExtras', () => {
   it('falls back on old documents and finds the set with the least assistance', () => {
-    expect(progressExtras({}, 'squat', 'global')).toEqual({ category: null })
-    expect(progressExtras({ bestSetWeight: 100, sets: [{ weight: 90, reps: 10 }, { weight: 100, reps: 6 }, { weight: 100, reps: 8 }] }, 'squat', 'global')).toEqual({ bestSetReps: 8, category: null })
+    expect(progressExtras({}, 'squat', 'global')).toEqual({ category: 'legs' })
+    expect(progressExtras({}, 'treadmill', 'global')).toEqual({ category: 'cardio' })
+    expect(progressExtras({}, 'treadmill', 'user')).toEqual({ category: null })
+    expect(progressExtras({ bestSetWeight: 100, sets: [{ weight: 90, reps: 10 }, { weight: 100, reps: 6 }, { weight: 100, reps: 8 }] }, 'squat', 'global')).toEqual({ bestSetReps: 8, category: 'legs' })
     expect(progressExtras({ bestSetReps: 6, category: 'legs', sets: [{ weight: 10, reps: 5 }] }, 'squat', 'global')).toEqual({ bestSetReps: 6, category: 'legs' })
     const sets = [{ weight: 40, reps: 8 }, { weight: 25, reps: 6 }, { weight: 25, reps: 7 }, { weight: 20, reps: 0 }, { weight: 'x', reps: 9 }]
     expect(progressExtras({ sets }, 'assisted-pull-up', 'global').leastAssisted).toEqual({ weight: 25, reps: 7 })
