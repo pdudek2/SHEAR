@@ -249,7 +249,8 @@ export function summarizeAllExercises(loaded: ProgressSessionLite[], rangeDays: 
 }
 
 export function formatAverageBasis({ trainingWeeks, headlineVolume }: Pick<AllExercisesSummary, 'trainingWeeks' | 'headlineVolume'>): string {
-  if (trainingWeeks) return `average of ${trainingWeeks} training ${trainingWeeks === 1 ? 'week' : 'weeks'}`
+  // The no-break space keeps "weeks" from wrapping alone on narrow phones.
+  if (trainingWeeks) return `avg of ${trainingWeeks} training\u00a0${trainingWeeks === 1 ? 'week' : 'weeks'}`
   return headlineVolume === null ? 'no full training week' : 'this week so far'
 }
 

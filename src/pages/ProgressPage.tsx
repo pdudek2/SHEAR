@@ -596,8 +596,9 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
 function WeeklyVolumeChart({ weeks, trainingWeeks, average, units }: { weeks: SummaryWeek[]; trainingWeeks: number; average: number | null; units: Units }) {
   const data = weeks.map((week) => ({ ...week, axisLabel: week.current ? 'so far' : week.weekLabel }))
   const currentIndex = weeks.findIndex(({ current }) => current)
-  // Axis values next to the average label would collide with it.
-  const tickLabel = (value: number) => value === 0 || (average !== null && Math.abs(value - average) < average * 0.25)
+  const noVolume = weeks.every(({ volume }) => !volume)
+  // Axis values next to the average label would collide with it; with no volume the scale is arbitrary.
+  const tickLabel = (value: number) => value === 0 || noVolume || (average !== null && Math.abs(value - average) < average * 0.25)
     ? ''
     : formatShortVolume(value, units)
   return (

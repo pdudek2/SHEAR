@@ -116,12 +116,12 @@ describe('averages over the weeks with training', () => {
     expect([back.averageVolume, back.headlineVolume, back.trainingWeeks, back.averageDelta]).toEqual([9000, 9000, 1, null])
     expect(back.weeks).toHaveLength(13)
     expect(back.muscles[0]).toEqual({ muscle: 'quads', sets: 12 })
-    expect(formatAverageBasis(back)).toBe('average of 1 training week')
+    expect(formatAverageBasis(back)).toBe('avg of 1 training\u00a0week')
     // The workout count still compares calendar periods.
     expect([back.comparable, back.workouts, back.previousWorkouts]).toEqual([true, 1, 12])
 
     const later = summarizeAllExercises([...before, squat('2026-11-03'), squat('2026-11-10')], 90, anchor)
-    expect([later.trainingWeeks, later.averageDelta, formatAverageBasis(later)]).toEqual([2, 0, 'average of 2 training weeks'])
+    expect([later.trainingWeeks, later.averageDelta, formatAverageBasis(later)]).toEqual([2, 0, 'avg of 2 training\u00a0weeks'])
   })
 
   it('shows this week on the week of the return', () => {

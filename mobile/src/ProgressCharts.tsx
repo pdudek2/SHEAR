@@ -33,8 +33,9 @@ function Chart({ values, labels, units, width, kind, summary, onInspect, average
     ? [...progressChartLabelIndices(labels.length, kind).filter((index) => xAt(last) - xAt(index) >= 44), last]
     : progressChartLabelIndices(labels.length, kind)
   const barWidth = Math.min(24, band * 0.6)
-  // Axis values next to the average label would collide with it.
-  const hiddenTick = (tick: number) => bars && (tick === 0 || (average !== null && Math.abs(tick - average) < average * 0.25))
+  const noVolume = values.every((value) => !value)
+  // Axis values next to the average label would collide with it; with no volume the scale is arbitrary.
+  const hiddenTick = (tick: number) => bars && (tick === 0 || noVolume || (average !== null && Math.abs(tick - average) < average * 0.25))
   const selectedValue = selected === null ? null : values[selected]
   const pick = (locationX: number) => {
     const fraction = Math.max(0, Math.min(1, locationX / plotWidth))

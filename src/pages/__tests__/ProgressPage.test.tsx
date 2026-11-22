@@ -208,7 +208,7 @@ describe('ProgressPage', () => {
     await screen.findByRole('region', { name: 'All exercises' })
     const expected = summarizeAllExercises(sessions, 90, NOW)
     expect(expected.averageVolume).not.toBeNull()
-    expect(heroText()).toMatch(/average of \d+ training weeks/)
+    expect(heroText()).toMatch(/avg of \d+ training\sweeks/)
     expect(heroText()).toContain('kg / week')
     expect(workoutCount()).toBe(String(expected.workouts))
 
@@ -228,7 +228,7 @@ describe('ProgressPage', () => {
     render(<ProgressPage />)
 
     await screen.findByRole('region', { name: 'All exercises' })
-    expect(heroText()).toContain('average of 1 training week')
+    expect(heroText()).toContain('avg of 1 training\u00a0week')
     expect(heroText()).toContain('9,000kg / week')
     expect(heroText()).not.toContain('vs previous')
     expect(heroText()).toContain('Workouts1−9')
