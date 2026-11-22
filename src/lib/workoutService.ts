@@ -19,7 +19,7 @@ import { ApiRejectedError, callAuthedApi } from './authedApi'
 import { clearWorkoutDeleteRecovery, readWorkoutDeleteRecovery, writeWorkoutDeleteRecovery } from './workoutDeleteRecovery'
 import { confirmedQuery } from './confirmedQuery'
 import { parseCompressionRecord, parseGroup, type CompressionRecord } from '../shared/compressionRecord'
-import { countsTowardVolume } from '../shared/progress'
+import { workoutVolume } from '../shared/progress'
 import { startOfWeek } from '../shared/week'
 
 interface WorkoutSetSummary {
@@ -216,12 +216,7 @@ export function countWeeklyWorkouts(workouts: WorkoutSummary[]): number {
 export { calcStreak } from '../shared/streak'
 
 export function calcVolume(workout: WorkoutSummary): number {
-  return workout.exercises.reduce(
-    (total, exercise) => countsTowardVolume(exercise.exerciseId, exercise.exerciseSource)
-      ? total + exercise.sets.reduce((sum, set) => sum + set.weight * set.reps, 0)
-      : total,
-    0
-  )
+  return workoutVolume(workout.exercises)
 }
 
 function normalizeWorkoutSummary(id: string, raw: unknown): WorkoutSummary {

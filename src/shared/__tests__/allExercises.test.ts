@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { formatBestSet, formatCountChange, formatPercentChange, formatSetChange, progressExtras, summarizeAllExercises, type ProgressSessionLite } from '../progress'
+import { formatBestSet, formatCountChange, formatPercentChange, formatSetChange, progressExtras, summarizeAllExercises, workoutVolume, type ProgressSessionLite } from '../progress'
 import { getWeekDates } from '../week'
 
 const at = (date: string) => new Date(`${date}T18:00:00`).getTime()
@@ -117,6 +117,16 @@ describe('weeks in a time zone that skips midnight', () => {
     const squats = dates.map((date, index) => session({ workoutId: `t${index}`, exerciseId: 'squat', finishedAt: at(date), totalVolume: 3000 }))
     expect(summarizeAllExercises(squats, 30, at('2026-09-16')).weeks.map(({ volume }) => volume)).toEqual([3000, 3000, 3000, 0])
     expect(getWeekDates(new Date(at('2026-09-06')))[0]).toEqual(new Date('2026-08-31T00:00:00'))
+  })
+})
+
+describe('workoutVolume', () => {
+  it.each([
+    ['global', 'bench-press', 720],
+    ['global', 'assisted-pull-up', 0],
+    ['user', 'assisted-pull-up', 720],
+  ] as const)('counts %s %s as %i kg', (exerciseSource, exerciseId, volume) => {
+    expect(workoutVolume([{ exerciseId, exerciseSource, sets: [{ weight: 30, reps: 8 }, { weight: 60, reps: 8 }] }])).toBe(volume)
   })
 })
 

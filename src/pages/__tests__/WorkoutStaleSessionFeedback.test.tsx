@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   closureIntent: null as WorkoutClosureIntent | null,
   closureState: 'idle',
   continueStaleSession: vi.fn(),
+  desktop: false,
   discardWorkoutLifecycle: vi.fn(),
   discardStaleSession: vi.fn(),
   finalizeWorkout: vi.fn(),
@@ -138,7 +139,7 @@ vi.mock('../../lib/templateService', () => ({
   getTemplate: vi.fn().mockResolvedValue(null),
 }))
 
-vi.mock('../../hooks/useMediaQuery', () => ({ useMediaQuery: () => false }))
+vi.mock('../../hooks/useMediaQuery', () => ({ useMediaQuery: () => mocks.desktop }))
 vi.mock('../../components/MobileInteractionProvider', () => ({
   useMobileInteraction: () => ({ compactFixedUi: false, visualViewportHeight: null }),
 }))
@@ -211,6 +212,7 @@ describe('WorkoutPage stale-session feedback', () => {
     mocks.closureIntent = null
     mocks.closureState = 'idle'
     mocks.continueStaleSession.mockReset()
+    mocks.desktop = false
     mocks.discardWorkoutLifecycle.mockReset()
     mocks.discardStaleSession.mockReset()
     mocks.finalizeWorkout.mockReset()
@@ -369,6 +371,32 @@ describe('WorkoutPage stale-session feedback', () => {
       'Saved session resumed with a refreshed timer.',
     ))
     expect(mocks.toastError).not.toHaveBeenCalled()
+  })
+
+  it('keeps assistance and open sets out of the running volume', () => {
+    mocks.desktop = true
+    mocks.staleSession = null
+    mocks.active = {
+      sessionId: 'session-assisted',
+      startedAt: 500,
+      label: 'Pull',
+      exercises: [{
+        exerciseId: 'bench-press',
+        exerciseSource: 'global',
+        name: 'Bench Press',
+        sets: [{ weight: '65', reps: '8', done: true }, { weight: '65', reps: '8', done: false }],
+      }, {
+        exerciseId: 'assisted-pull-up',
+        exerciseSource: 'global',
+        name: 'Assisted Pull-up',
+        sets: [{ weight: '30', reps: '8', done: true }],
+      }],
+    }
+
+    renderStaleSessionPage()
+    fireEvent.click(screen.getAllByRole('button', { name: 'More workout options' })[0])
+
+    expect(document.querySelector('.workout-options-summary')).toHaveTextContent('520 kg')
   })
 
   it('clamps the elapsed timer when the active session starts in the future', () => {

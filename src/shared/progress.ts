@@ -67,6 +67,12 @@ export function countsTowardVolume(exerciseId: string | undefined, exerciseSourc
   return !isAssistedExercise(exerciseId, exerciseSource)
 }
 
+export function workoutVolume(exercises: readonly { exerciseId?: string; exerciseSource?: 'global' | 'user'; sets: readonly { weight: number; reps: number }[] }[]): number {
+  return exercises.reduce((total, { exerciseId, exerciseSource, sets }) => countsTowardVolume(exerciseId, exerciseSource)
+    ? total + sets.reduce((sum, { weight, reps }) => sum + weight * reps, 0)
+    : total, 0)
+}
+
 // Reads the optional fields of an `exerciseSessions` document; old or odd values fall back instead of failing the load.
 export function progressExtras(data: Record<string, unknown>, exerciseId: string, exerciseSource: 'global' | 'user'): Pick<ProgressSessionLite, 'bestSetReps' | 'category' | 'leastAssisted'> {
   const finite = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
