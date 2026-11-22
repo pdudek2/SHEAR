@@ -157,6 +157,8 @@ describe('weeks in a time zone that skips midnight', () => {
 
   it('keeps the Sunday of the change in its week on Progress and Home', () => {
     vi.stubEnv('TZ', 'America/Santiago')
+    // Guards the test itself: in a worker thread Node ignores a TZ change.
+    expect(new Date('2026-09-06T00:00:00').getHours()).toBe(1)
     const dates = ['2026-08-25', '2026-09-06', '2026-09-08']
     const squats = dates.map((date, index) => session({ workoutId: `t${index}`, exerciseId: 'squat', finishedAt: at(date), totalVolume: 3000 }))
     expect(summarizeAllExercises(squats, 30, at('2026-09-16')).weeks.map(({ volume }) => volume)).toEqual([3000, 3000, 3000, 0])

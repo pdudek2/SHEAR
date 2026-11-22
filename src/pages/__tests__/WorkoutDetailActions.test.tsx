@@ -733,6 +733,7 @@ describe('WorkoutDetailPage delete action', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Assisted Pull-up/ }))
     expect(screen.getByRole('cell', { name: '30' }).closest('tr')).toHaveTextContent(/^1308—$/)
+    expect(screen.getAllByText('400 kg').length).toBeGreaterThan(0)
     expect(screen.queryByText('240')).not.toBeInTheDocument()
     await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'Edit workout' })[0]) })
     expect(screen.getByRole('spinbutton', { name: /^Weight, Assisted Pull-up, set 1/ })).toBeInTheDocument()

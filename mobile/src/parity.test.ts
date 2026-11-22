@@ -59,6 +59,11 @@ test('the Coach read states only what the last workout recorded', () => {
   assert.equal(read.title, 'Bench Press: 90 kg × 6')
   assert.match(read.body, /^3 sets across 2 exercises, /)
   assert.equal(lastWorkoutRead({ startedAt: 0, exercises: [] }, 'kg').title, 'Workout')
+  const assisted = lastWorkoutRead({ startedAt: 0, exercises: [
+    { name: 'Bench Press', sets: [{ weight: 65, reps: 8 }] },
+    { exerciseId: 'assisted-pull-up', exerciseSource: 'global', name: 'Assisted Pull-up', sets: [{ weight: 30, reps: 8 }] },
+  ] }, 'kg')
+  assert.equal(assisted.body, '2 sets across 2 exercises, 520 kg in total.')
 })
 
 test('the month calendar pairs each day with its newest workout and starts weeks on Monday', () => {

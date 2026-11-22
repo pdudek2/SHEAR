@@ -269,7 +269,7 @@ describe('ProgressPage', () => {
     render(<ProgressPage />)
 
     await screen.findByRole('region', { name: 'All exercises' })
-    // No full week yet, so the headline counts this week: 1,560 kg is 3,439 lbs.
+    // No full training week yet, so the headline counts this week: 1,560 kg is 3,439 lbs.
     expect(heroText()).toContain('this week so far')
     expect(heroText()).toContain('3,440lbs')
     const row = screen.getByRole('button', { name: /Wyciskanie sztangi/ })
