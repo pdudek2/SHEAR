@@ -280,20 +280,25 @@ export default function WorkoutPage() {
         const setAt = at >= 0 ? exercises[at]!.sets.findIndex((set, index) => (setKey ? set.clientId === setKey : index === setIndex)) : -1
         if (setAt >= 0) toggleSet(at, setAt, true)
       }
-      if (unweighted) toast('No weight entered. Log this set without weight?', { id: 'log-without-weight', action: { label: 'Log without weight', onClick: logAnyway } })
+      const enterWeight = () => {
+        flushSync(() => {
+          setManualExerciseClientId(exerciseKey)
+          setSelectedSet({ exerciseId: exerciseKey, setId: setKey ?? String(setIndex) })
+        })
+        // Sonner hands focus back to the element from before the toast when focus leaves it; let that happen first.
+        const inToast = document.activeElement instanceof HTMLElement && document.activeElement.closest('[data-sonner-toaster]')
+        if (inToast) (document.activeElement as HTMLElement).blur()
+        document.querySelector<HTMLInputElement>('.workout-set-panel input[role="spinbutton"]')?.focus()
+      }
+      if (unweighted) toast('No weight entered. Log this set without weight?', {
+        id: 'log-without-weight',
+        action: { label: 'Log without weight', onClick: logAnyway },
+        cancel: { label: 'Enter weight', onClick: enterWeight },
+      })
       else if (slip) toast(`${slip.title} ${slip.message}`, {
         id: 'log-weight-slip',
         action: { label: 'Log anyway', onClick: logAnyway },
-        cancel: { label: 'Fix', onClick: () => {
-          flushSync(() => {
-            setManualExerciseClientId(exerciseKey)
-            setSelectedSet({ exerciseId: exerciseKey, setId: setKey ?? String(setIndex) })
-          })
-          // Sonner hands focus back to the element from before the toast when focus leaves it; let that happen first.
-          const inToast = document.activeElement instanceof HTMLElement && document.activeElement.closest('[data-sonner-toaster]')
-          if (inToast) (document.activeElement as HTMLElement).blur()
-          document.querySelector<HTMLInputElement>('.workout-set-panel input[role="spinbutton"]')?.focus()
-        } },
+        cancel: { label: 'Fix', onClick: enterWeight },
       })
       return
     }
