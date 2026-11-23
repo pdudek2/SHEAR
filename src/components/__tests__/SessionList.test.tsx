@@ -13,7 +13,7 @@ const member = (exerciseId: string, name: string, done: number, total: number): 
 })
 
 describe('session list', () => {
-  it('shows a pair in rounds with the rest between them, the cut rounds and one Add round', () => {
+  it('shows a pair in rounds with the rest between them, the cut rounds, set removal and one Add round', () => {
     const session: ActiveWorkout = {
       sessionId: 's', startedAt: 1,
       exercises: [member('leg-curl', 'Leg Curl', 1, 2), member('hip-abduction', 'Hip Abduction', 0, 2)],
@@ -25,7 +25,7 @@ describe('session list', () => {
         ],
       },
     }
-    const on = { onSelect: vi.fn(), onToggle: vi.fn(), onRemove: vi.fn(), onAddRound: vi.fn() }
+    const on = { onSelect: vi.fn(), onToggle: vi.fn(), onRemove: vi.fn(), onRemoveSet: vi.fn(), onAddRound: vi.fn() }
     render(<GroupBlock session={session} indices={[0, 1]} currentIndex={1} panelSet={0} units="kg" userExercises={new Map()} metaOf={() => 'Legs · Machine'} drawnSetId={null} {...on} />)
 
     expect(screen.getByRole('region', { name: 'Superset, 2 rounds' })).toBeInTheDocument()
@@ -38,7 +38,8 @@ describe('session list', () => {
 
     fireEvent.click(rows[2]!)
     expect(on.onSelect).toHaveBeenCalledWith(0, 1)
-    expect(screen.queryByRole('button', { name: /^Remove set/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove set 1B for Hip Abduction' }))
+    expect(on.onRemoveSet).toHaveBeenCalledWith(1, 0)
     expect(screen.getAllByRole('button', { name: /^Unmark set/ })).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Unmark set 1A for Leg Curl' }))
     expect(on.onToggle).toHaveBeenCalledWith(0, 0)
@@ -57,7 +58,7 @@ describe('session list', () => {
     const pair = (done: number[]) => ({ sessionId: 's', startedAt: 1, exercises: [member('leg-curl', 'Leg Curl', done[0]!, 2), member('hip-abduction', 'Hip Abduction', done[1]!, 2)] })
     const props = (session: ActiveWorkout, currentIndex: number, panelSet: number) => ({
       session, indices: [0, 1], currentIndex, panelSet, units: 'kg' as const, userExercises: new Map(), metaOf: () => null, drawnSetId: null,
-      inlinePanel: <button type="button">Log set</button>, onSelect: vi.fn(), onToggle: vi.fn(), onRemove: vi.fn(), onAddRound: vi.fn(),
+      inlinePanel: <button type="button">Log set</button>, onSelect: vi.fn(), onToggle: vi.fn(), onRemove: vi.fn(), onRemoveSet: vi.fn(), onAddRound: vi.fn(),
     })
     const { rerender } = render(<GroupBlock {...props(pair([0, 0]), 0, 0)} />)
     const log = screen.getByRole('button', { name: 'Log set' })
@@ -84,7 +85,7 @@ describe('session list', () => {
     const session: ActiveWorkout = { sessionId: 's', startedAt: 1, exercises: [member('leg-curl', 'Leg Curl', 1, 2), member('hip-abduction', 'Hip Abduction', 0, 2)] }
     render(<GroupBlock session={session} indices={[0, 1]} currentIndex={1} panelSet={0} units="kg" userExercises={new Map()} metaOf={() => null} drawnSetId={null}
       hint={{ suggestion: { label: '45 kg, aim for 10 reps', weight: 45, reps: 10 }, onApply, onDismiss: vi.fn() }}
-      onSelect={vi.fn()} onToggle={vi.fn()} onRemove={vi.fn()} onAddRound={vi.fn()} />)
+      onSelect={vi.fn()} onToggle={vi.fn()} onRemove={vi.fn()} onRemoveSet={vi.fn()} onAddRound={vi.fn()} />)
 
     expect(screen.getByText('B · Hip Abduction: 45 kg, aim for 10 reps')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))

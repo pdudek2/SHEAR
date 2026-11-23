@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, ChevronLeft, ChevronRight, Ellipsis, Plus, Trash2 } from 'lucide-react'
@@ -283,7 +284,16 @@ export default function WorkoutPage() {
       else if (slip) toast(`${slip.title} ${slip.message}`, {
         id: 'log-weight-slip',
         action: { label: 'Log anyway', onClick: logAnyway },
-        cancel: { label: 'Fix', onClick: () => document.querySelector<HTMLInputElement>('.workout-set-panel input[role="spinbutton"]')?.focus() },
+        cancel: { label: 'Fix', onClick: () => {
+          flushSync(() => {
+            setManualExerciseClientId(exerciseKey)
+            setSelectedSet({ exerciseId: exerciseKey, setId: setKey ?? String(setIndex) })
+          })
+          // Sonner hands focus back to the element from before the toast when focus leaves it; let that happen first.
+          const inToast = document.activeElement instanceof HTMLElement && document.activeElement.closest('[data-sonner-toaster]')
+          if (inToast) (document.activeElement as HTMLElement).blur()
+          document.querySelector<HTMLInputElement>('.workout-set-panel input[role="spinbutton"]')?.focus()
+        } },
       })
       return
     }
@@ -1170,6 +1180,7 @@ export default function WorkoutPage() {
                         onSelect={selectMemberSet}
                         onToggle={handleToggleSet}
                         onRemove={handleRemoveExercise}
+                        onRemoveSet={handleRemoveSet}
                         onAddRound={(indices) => {
                           indices.forEach((index) => useWorkoutStore.getState().addSet(index))
                           if ('vibrate' in navigator) navigator.vibrate(8)
