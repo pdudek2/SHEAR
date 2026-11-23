@@ -1020,7 +1020,8 @@ function SessionScreen({ user }: { user: AuthUser }) {
       return
     }
     setDone(exerciseId, setId, done)
-    if (!done) { changeRest(null); return }
+    // The set taken back is the one to redo, also when a pair has moved on to the next round.
+    if (!done) { changeRest(null); selectMemberSet(exerciseId, setId); return }
     setLastLogged({ exerciseId, setId, draw: true })
     setSelectedSet(null)
     const exerciseIndex = liveSession ? liveSession.exercises.findIndex(({ clientId }) => clientId === exerciseId) : -1
