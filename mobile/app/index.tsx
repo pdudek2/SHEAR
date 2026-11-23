@@ -479,13 +479,8 @@ function ExerciseLedger({ history, exercise, units, metadata, target, lowReadine
             <Text numberOfLines={1} style={[styles.setCellMuted, styles.setValue]}>{previousText}</Text>
             <Text numberOfLines={1} style={[styles.setToday, styles.setValue, set.done && styles.setTodayDone, current && styles.setTodayCurrent]}>{today}</Text>
           </Pressable>
-          {current ? <Pressable accessibilityRole="button" accessibilityLabel={`Remove set ${index + 1}`} onPress={() => {
-            const remove = () => editing.removeSet(exercise.clientId, set.clientId)
-            if (!set.done && !set.weight.trim() && !set.reps.trim()) { remove(); return }
-            showDialog('Remove set?', removeSetMessage(set.done), [{ text: 'Keep', style: 'cancel' }, { text: 'Remove set', style: 'destructive', onPress: remove }])
-          }} style={[styles.setTrailingColumn, styles.setTouchTarget]}>
-            <Svg width={15} height={15} viewBox="0 0 24 24" style={{ alignSelf: 'center' }}><Path d="m18 6-12 12M6 6l12 12" fill="none" stroke={colors.mutedSoft} strokeWidth={2} strokeLinecap="round" /></Svg>
-          </Pressable> : <View style={styles.setTrailingColumn} />}
+          {current ? <RemoveSetButton label={`Remove set ${index + 1}`} set={set} onRemove={() => editing.removeSet(exercise.clientId, set.clientId)} />
+            : <View style={styles.setTrailingColumn} />}
         </View>
       })}
       {history.state.status === 'error' && <Pressable accessibilityRole="button" onPress={history.retry} style={styles.lookupAction}><Text style={styles.lookupText}>History unavailable · Retry</Text></Pressable>}
@@ -497,6 +492,15 @@ function ExerciseLedger({ history, exercise, units, metadata, target, lowReadine
         </View></Pressable>
     </View>
   </View>
+}
+
+function RemoveSetButton({ label, set, onRemove }: { label: string; set: WorkoutExercise['sets'][number]; onRemove: () => void }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => {
+    if (!set.done && !set.weight.trim() && !set.reps.trim()) { onRemove(); return }
+    showDialog('Remove set?', removeSetMessage(set.done), [{ text: 'Keep', style: 'cancel' }, { text: 'Remove set', style: 'destructive', onPress: onRemove }])
+  }} style={[styles.setTrailingColumn, styles.setTouchTarget]}>
+    <Svg width={15} height={15} viewBox="0 0 24 24" style={{ alignSelf: 'center' }}><Path d="m18 6-12 12M6 6l12 12" fill="none" stroke={colors.mutedSoft} strokeWidth={2} strokeLinecap="round" /></Svg>
+  </Pressable>
 }
 
 const exerciseIdentity = (exercise: WorkoutExercise, index: number) => exercise.clientId ?? `${exercise.exerciseSource}:${exercise.exerciseId}:${index}`
@@ -573,7 +577,8 @@ function GroupBlock({ uid, session, indices, currentIndex, panelSet, units, edit
             <Text numberOfLines={1} style={[styles.setCellMuted, styles.setValue]}>{previous}</Text>
             <Text numberOfLines={1} style={[styles.setToday, styles.setValue, set.done && styles.setTodayDone, current && styles.setTodayCurrent]}>{setPairLabel(set, units)}</Text>
           </Pressable>
-          <View style={styles.setTrailingColumn} />
+          {current ? <RemoveSetButton label={`Remove set ${label} for ${exercise.name}`} set={set} onRemove={() => editing.removeSet(exercise.clientId, set.clientId)} />
+            : <View style={styles.setTrailingColumn} />}
           {/* Mounts again whenever another row becomes current, so the list can bring it into view. */}
           {current && <View key={set.clientId} onLayout={onCurrentRow} style={styles.rowMarker} />}
         </View>
@@ -1009,9 +1014,9 @@ function SessionScreen({ user }: { user: AuthUser }) {
     if (ask) {
       // Back and the backdrop also run the cancel button; onDismiss follows it in the same tick and undoes both effects.
       showDialog(ask.title, ask.message, [
-        { text: ask.fix, style: 'cancel', onPress: () => { if (currentId) setSelectedSet({ exerciseId: currentId, setId }); setWeightFocus(Date.now()) } },
+        { text: ask.fix, style: 'cancel', onPress: () => { selectMemberSet(exerciseId, setId); setWeightFocus(Date.now()) } },
         { text: ask.log, onPress: () => latestToggle.current(exerciseId, setId, true, true) },
-      ], { onDismiss: () => { setSelectedSet(selectedSet); setWeightFocus(0) } })
+      ], { onDismiss: () => { setManualExercise(manualExercise); setSelectedSet(selectedSet); setWeightFocus(0) } })
       return
     }
     setDone(exerciseId, setId, done)
