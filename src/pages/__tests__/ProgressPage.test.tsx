@@ -122,6 +122,7 @@ function successfulLoad(options: {
   recordsTruncated?: boolean
   freshness?: ProgressLoadResult['freshness']
   fetchedAt?: number
+  firstWorkoutAt?: number | null
 } = {}): ProgressLoadResult {
   return {
     sessions: {
@@ -138,6 +139,7 @@ function successfulLoad(options: {
         truncated: options.recordsTruncated ?? false,
       },
     },
+    firstWorkoutAt: options.firstWorkoutAt ?? null,
     freshness: options.freshness ?? 'fresh',
     fetchedAt: options.fetchedAt ?? NOW,
   }
@@ -393,6 +395,7 @@ describe('ProgressPage', () => {
     mockLoadProgressData.mockResolvedValue({
       sessions: { status: 'error', error: sessionsError },
       records: { status: 'error', error: recordsError },
+      firstWorkoutAt: null,
       freshness: 'uncertain',
       fetchedAt: NOW,
     })

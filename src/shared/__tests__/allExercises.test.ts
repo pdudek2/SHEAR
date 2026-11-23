@@ -191,3 +191,32 @@ describe('progressExtras', () => {
     expect(progressExtras({ sets }, 'assisted-pull-up', 'global').leastAssisted).toEqual({ weight: 25, reps: 7 })
   })
 })
+
+describe('summarizeAllExercises on a young account', () => {
+  // Squat every Monday, Wednesday and Friday from `first`, 6,000 kg each: a full week is 18,000 kg.
+  const steady = (first: string, days: number) => Array.from({ length: days }, (_, day) => new Date(new Date(`${first}T18:00:00`).getTime() + day * 86_400_000))
+    .filter((date) => [1, 3, 5].includes(date.getDay()) && date.getTime() < anchor)
+    .map((date) => session({ workoutId: `y${date.getTime()}`, exerciseId: 'squat', finishedAt: date.getTime(), bestSetWeight: 100, bestSetReps: 8, totalVolume: 6000, totalSets: 4 }))
+
+  it('leaves out the partial week of the first workout while another training week counts', () => {
+    // First workout on Friday Nov 6: its week has one workout, the full week after it three.
+    const young = steady('2026-11-06', 12)
+    const firstAt = young[0]!.finishedAt
+    const summary = summarizeAllExercises(young, 30, anchor, firstAt)
+    expect([summary.averageVolume, summary.trainingWeeks]).toEqual([18000, 1])
+    expect(summary.muscles[0]).toEqual({ muscle: 'quads', sets: 12 })
+    // With only the first week behind it, that week still gives the average.
+    const first = steady('2026-11-13', 5)
+    expect(summarizeAllExercises(first, 30, anchor, first[0]!.finishedAt).averageVolume).toBe(6000)
+  })
+
+  it('compares nothing when the first workout came after the period before began', () => {
+    // 45 days of the same training: the period before holds only its last 15 days.
+    const young = steady('2026-10-05', 44)
+    const summary = summarizeAllExercises(young, 30, anchor, young[0]!.finishedAt)
+    expect([summary.comparable, summary.averageDelta, summary.exercisesCompared]).toEqual([false, null, false])
+    expect(summary.exercises.map(({ change }) => change)).toEqual([null])
+    // Training from before the period before compares as usual.
+    expect(summarizeAllExercises(young, 30, anchor, at('2026-09-01')).comparable).toBe(true)
+  })
+})

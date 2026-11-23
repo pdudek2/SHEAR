@@ -13,7 +13,7 @@ import {
 } from '../../src/shared/progress'
 import HistoryHeader from '../src/HistoryHeader'
 import { MuscleBars, StrengthChart, WeeklyVolumeChart } from '../src/ProgressCharts'
-import { readProgressRecords, readProgressSessions, readRecentProgressWorkouts, retryProgressMaterialization } from '../src/firebase'
+import { readFirstWorkoutAt, readProgressRecords, readProgressSessions, readRecentProgressWorkouts, retryProgressMaterialization } from '../src/firebase'
 import { loadProgressData, mergeProgressSnapshot, recallProgress, rememberProgress, startProgressRead, type ProgressSnapshot } from '../src/progressData'
 import { readGeneration } from '../src/scopedRead'
 import { useActiveRuntime, useAuthRuntime } from '../src/runtime'
@@ -48,7 +48,7 @@ function ProgressContent({ uid }: { uid: string }) {
     const since = readGeneration()
     return startProgressRead(() => loadProgressData(uid, rangeDays, {
       recent: readRecentProgressWorkouts, retryMaterialization: retryProgressMaterialization,
-      sessions: readProgressSessions, records: readProgressRecords,
+      sessions: readProgressSessions, records: readProgressRecords, firstWorkout: readFirstWorkoutAt,
     }), (result) => setSnapshot((previous) => {
       const next = mergeProgressSnapshot(previous, result, rangeDays)
       rememberProgress(uid, next, since)
@@ -63,7 +63,8 @@ function ProgressContent({ uid }: { uid: string }) {
   const fetchedAt = coverage ? snapshot?.sessions?.fetchedAt ?? 0 : 0
   const records = snapshot?.records?.records ?? []
   const currentSessions = useMemo(() => sessions.filter((session) => session.finishedAt >= fetchedAt - rangeDays * 86_400_000), [sessions, fetchedAt, rangeDays])
-  const summary = useMemo(() => summarizeAllExercises(sessions, rangeDays, fetchedAt), [sessions, rangeDays, fetchedAt])
+  const firstWorkoutAt = coverage ? snapshot?.sessions?.firstWorkoutAt ?? null : null
+  const summary = useMemo(() => summarizeAllExercises(sessions, rangeDays, fetchedAt, firstWorkoutAt), [sessions, rangeDays, fetchedAt, firstWorkoutAt])
   const compared = summary.exercisesCompared
   const strength = useMemo(() => aggregateStrengthProgression(currentSessions), [currentSessions])
   const chartable = new Set(strength.series.map((series) => series.key))

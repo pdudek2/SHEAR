@@ -4,7 +4,7 @@ import {
   type ProgressRecordsResult,
   type ProgressSessionsResult,
 } from './progressService'
-import { getRecentWorkouts, retryPendingMaterializations } from './workoutService'
+import { getFirstWorkoutStartedAt, getRecentWorkouts, retryPendingMaterializations } from './workoutService'
 
 export type ProgressDatasetResult<T> =
   | { status: 'success'; value: T }
@@ -13,6 +13,8 @@ export type ProgressDatasetResult<T> =
 export interface ProgressLoadResult {
   sessions: ProgressDatasetResult<ProgressSessionsResult>
   records: ProgressDatasetResult<ProgressRecordsResult>
+  // Null when unknown; Progress then compares as if the history were complete.
+  firstWorkoutAt: number | null
   freshness: 'fresh' | 'uncertain'
   fetchedAt: number
 }
@@ -38,14 +40,16 @@ export async function loadProgressData(
     freshness = 'uncertain'
   }
 
-  const [sessionsResult, recordsResult] = await Promise.allSettled([
+  const [sessionsResult, recordsResult, firstResult] = await Promise.allSettled([
     getProgressSessions(uid, now - 2 * rangeDays * 86_400_000),
     getRecords(uid),
+    getFirstWorkoutStartedAt(uid),
   ])
 
   return {
     sessions: toDatasetResult(sessionsResult),
     records: toDatasetResult(recordsResult),
+    firstWorkoutAt: firstResult.status === 'fulfilled' ? firstResult.value : null,
     freshness,
     fetchedAt: now,
   }

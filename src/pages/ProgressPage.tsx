@@ -119,6 +119,7 @@ interface ProgressSnapshot {
   rangeDays: number
   sessions: ProgressSessionLite[]
   sessionsTruncated: boolean
+  firstWorkoutAt: number | null
   // Read only to tell an account without workouts from a range without them.
   records: RecordSummary[]
   fetchedAt: number
@@ -204,6 +205,7 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
               rangeDays: requestedRangeDays,
               sessions: result.sessions.value.sessions,
               sessionsTruncated: result.sessions.value.truncated,
+              firstWorkoutAt: result.firstWorkoutAt,
               records: next?.records ?? [],
               fetchedAt: result.fetchedAt,
             }
@@ -214,6 +216,7 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
               rangeDays: next?.rangeDays ?? 0,
               sessions: next?.sessions ?? [],
               sessionsTruncated: next?.sessionsTruncated ?? false,
+              firstWorkoutAt: next?.firstWorkoutAt ?? null,
               records: result.records.value.records,
               fetchedAt: next?.fetchedAt ?? 0,
             }
@@ -255,8 +258,8 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
   }, [sessions, rangeDays, fetchedAt])
 
   const summary = useMemo(
-    () => summarizeAllExercises(sessions, rangeDays, fetchedAt),
-    [sessions, rangeDays, fetchedAt],
+    () => summarizeAllExercises(sessions, rangeDays, fetchedAt, snapshot?.firstWorkoutAt ?? null),
+    [sessions, rangeDays, fetchedAt, snapshot?.firstWorkoutAt],
   )
   const compared = summary.exercisesCompared
 

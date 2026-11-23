@@ -55,6 +55,8 @@ export type ProgressRead<T> = { data: T; fromCache: boolean }
 export interface ProgressLoadResult {
   sessions: Dataset<ProgressSessionsResult>
   records: Dataset<ProgressRecordsResult>
+  // Null when unknown; Progress then compares as if the history were complete.
+  firstWorkoutAt: number | null
   freshness: 'fresh' | 'uncertain'
   fetchedAt: number
 }
@@ -64,6 +66,7 @@ export async function loadProgressData(uid: string, rangeDays: number, dependenc
   retryMaterialization: (uid: string, workoutId: string) => Promise<void>
   sessions: (uid: string, fromMs: number) => Promise<ProgressRead<ProgressSessionsResult>>
   records: (uid: string) => Promise<ProgressRead<ProgressRecordsResult>>
+  firstWorkout: (uid: string) => Promise<number | null>
 }, now = Date.now()): Promise<ProgressLoadResult> {
   let freshness: ProgressLoadResult['freshness'] = 'fresh'
   try {
@@ -75,18 +78,18 @@ export async function loadProgressData(uid: string, rangeDays: number, dependenc
       if (attempts.some((attempt) => attempt.status === 'rejected')) freshness = 'uncertain'
     }
   } catch { freshness = 'uncertain' }
-  const [sessionResult, recordResult] = await Promise.allSettled([
-    dependencies.sessions(uid, now - 2 * rangeDays * 86_400_000), dependencies.records(uid),
+  const [sessionResult, recordResult, firstResult] = await Promise.allSettled([
+    dependencies.sessions(uid, now - 2 * rangeDays * 86_400_000), dependencies.records(uid), dependencies.firstWorkout(uid),
   ])
   const dataset = <T>(result: PromiseSettledResult<ProgressRead<T>>): Dataset<T> => result.status === 'rejected'
     ? { status: 'error', error: result.reason }
     : result.value.fromCache ? { status: 'error', error: new Error('Only cached data was available.') }
       : { status: 'success', value: result.value.data }
-  return { sessions: dataset(sessionResult), records: dataset(recordResult), freshness, fetchedAt: now }
+  return { sessions: dataset(sessionResult), records: dataset(recordResult), firstWorkoutAt: firstResult.status === 'fulfilled' ? firstResult.value : null, freshness, fetchedAt: now }
 }
 
 export interface ProgressSnapshot {
-  sessions: (ProgressSessionsResult & { rangeDays: number; fetchedAt: number }) | null
+  sessions: (ProgressSessionsResult & { rangeDays: number; fetchedAt: number; firstWorkoutAt: number | null }) | null
   records: ProgressRecordsResult | null
   sessionsError: boolean
   recordsError: boolean
@@ -95,7 +98,7 @@ export interface ProgressSnapshot {
 
 export function mergeProgressSnapshot(previous: ProgressSnapshot | null, result: ProgressLoadResult, rangeDays: number): ProgressSnapshot {
   return {
-    sessions: result.sessions.status === 'success' ? { ...result.sessions.value, rangeDays, fetchedAt: result.fetchedAt } : previous?.sessions ?? null,
+    sessions: result.sessions.status === 'success' ? { ...result.sessions.value, rangeDays, fetchedAt: result.fetchedAt, firstWorkoutAt: result.firstWorkoutAt } : previous?.sessions ?? null,
     records: result.records.status === 'success' ? result.records.value : previous?.records ?? null,
     sessionsError: result.sessions.status === 'error', recordsError: result.records.status === 'error',
     freshnessUncertain: result.freshness === 'uncertain',
