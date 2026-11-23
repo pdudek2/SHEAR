@@ -41,8 +41,10 @@ test.describe('Superset in a session', () => {
 
       await page.goto('/dashboard')
       await page.getByRole('button', { name: 'Return to workout' }).click()
-      // The panel opens on 1A; Last for 1B shows its history has loaded.
-      await expect(page.getByRole('button', { name: /^1B, Hip Abduction: last 30 × 12/ })).toBeVisible()
+      // B's suggestion comes from the same history as the slip check, so it shows the check is ready; then back to 1A.
+      await page.getByRole('button', { name: /^1B, Hip Abduction/ }).click()
+      await expect(page.getByText(/B · Hip Abduction: Suggested/)).toBeVisible()
+      await page.getByRole('button', { name: /^1A, Leg Curl/ }).click()
       await expect(page.locator('.workout-set-panel input[role="spinbutton"]').first()).toHaveValue('40')
 
       await page.getByRole('button', { name: 'Mark set 1B for Hip Abduction' }).click()
@@ -52,7 +54,8 @@ test.describe('Superset in a session', () => {
 
       await page.getByRole('button', { name: 'Remove set 1B for Hip Abduction' }).click()
       await page.getByRole('button', { name: 'Remove set', exact: true }).click()
-      await expect(page.getByRole('button', { name: /^\d[AB],/ })).toHaveCount(3)
+      await expect(page.getByRole('button', { name: /^(1A|1B|2A),/ })).toHaveCount(3)
+      await expect(page.getByRole('button', { name: /^2B,/ })).toHaveCount(0)
       await expect(page.getByRole('region', { name: 'Superset, 2 rounds' })).toBeVisible()
     } finally {
       await deleteApp(app)

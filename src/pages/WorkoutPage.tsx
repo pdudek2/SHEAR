@@ -290,7 +290,8 @@ export default function WorkoutPage() {
             setSelectedSet({ exerciseId: exerciseKey, setId: setKey ?? String(setIndex) })
           })
           // Sonner hands focus back to the element from before the toast when focus leaves it; let that happen first.
-          ;(document.activeElement as HTMLElement | null)?.blur()
+          const inToast = document.activeElement instanceof HTMLElement && document.activeElement.closest('[data-sonner-toaster]')
+          if (inToast) (document.activeElement as HTMLElement).blur()
           document.querySelector<HTMLInputElement>('.workout-set-panel input[role="spinbutton"]')?.focus()
         } },
       })
