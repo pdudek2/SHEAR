@@ -62,6 +62,8 @@ test('cached reads and failed materialization stay uncertain without replacing v
   assert.equal(merged.sessions?.rangeDays, 90)
   assert.equal(merged.sessions?.sessions.length, 1)
   assert.equal(merged.sessions?.firstWorkoutAt, now - 400 * 86_400_000)
+  // A later load that could not read the first workout keeps the one already known.
+  assert.equal(mergeProgressSnapshot(previous, { ...successful(), firstWorkoutAt: null }, 90).sessions?.firstWorkoutAt, now - 400 * 86_400_000)
   assert.equal(merged.records?.records.length, 0)
   assert.equal(merged.sessionsError, true)
   assert.equal(merged.recordsError, false)

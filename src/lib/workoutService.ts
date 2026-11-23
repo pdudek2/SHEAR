@@ -79,6 +79,8 @@ export async function getRecentWorkouts(uid: string, count = 20): Promise<Workou
 
 export async function getFirstWorkoutStartedAt(uid: string): Promise<number | null> {
   const snap = confirmedQuery(await getDocs(query(collection(db, 'workouts'), where('userId', '==', uid), orderBy('startedAt', 'asc'), limit(1))))
+  // Offline, the earliest cached workout need not be the first one.
+  if (snap.metadata?.fromCache) throw new Error('The first workout could not be confirmed.')
   return snap.docs[0] ? normalizeWorkoutSummary(snap.docs[0].id, snap.docs[0].data()).startedAt : null
 }
 

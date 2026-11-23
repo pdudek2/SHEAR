@@ -205,7 +205,7 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
               rangeDays: requestedRangeDays,
               sessions: result.sessions.value.sessions,
               sessionsTruncated: result.sessions.value.truncated,
-              firstWorkoutAt: result.firstWorkoutAt,
+              firstWorkoutAt: result.firstWorkoutAt ?? previous?.firstWorkoutAt ?? null,
               records: next?.records ?? [],
               fetchedAt: result.fetchedAt,
             }

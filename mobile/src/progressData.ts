@@ -98,7 +98,7 @@ export interface ProgressSnapshot {
 
 export function mergeProgressSnapshot(previous: ProgressSnapshot | null, result: ProgressLoadResult, rangeDays: number): ProgressSnapshot {
   return {
-    sessions: result.sessions.status === 'success' ? { ...result.sessions.value, rangeDays, fetchedAt: result.fetchedAt, firstWorkoutAt: result.firstWorkoutAt } : previous?.sessions ?? null,
+    sessions: result.sessions.status === 'success' ? { ...result.sessions.value, rangeDays, fetchedAt: result.fetchedAt, firstWorkoutAt: result.firstWorkoutAt ?? previous?.sessions?.firstWorkoutAt ?? null } : previous?.sessions ?? null,
     records: result.records.status === 'success' ? result.records.value : previous?.records ?? null,
     sessionsError: result.sessions.status === 'error', recordsError: result.records.status === 'error',
     freshnessUncertain: result.freshness === 'uncertain',

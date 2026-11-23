@@ -280,6 +280,22 @@ describe('ProgressPage', () => {
     expect(screen.getByRole('img', { name: /Weight progression/ })).toHaveAccessibleName(/143.3 lbs/)
   })
 
+  it('compares with the period before only when the first workout came before it', async () => {
+    // Every third day for 120 days: the 90 days before the range hold only its first 30.
+    const sessions = Array.from({ length: 40 }, (_, index) => session(`s${index}`, index * 3))
+    mockLoadProgressData.mockResolvedValueOnce(successfulLoad({ sessions }))
+    const unknown = render(<ProgressPage />)
+    await screen.findByRole('region', { name: 'All exercises' })
+    expect(heroText()).toContain('vs previous 90 days')
+    unknown.unmount()
+
+    mockLoadProgressData.mockResolvedValueOnce(successfulLoad({ sessions, firstWorkoutAt: NOW - 117 * DAY_MS }))
+    render(<ProgressPage />)
+    await screen.findByRole('region', { name: 'All exercises' })
+    expect(heroText()).not.toContain('vs previous')
+    expect(screen.getByText('best set')).toBeInTheDocument()
+  })
+
   it('loads annual data older than 180 days and compares the previous year after a range switch', async () => {
     const annual = deferred<ProgressLoadResult>()
     mockLoadProgressData
