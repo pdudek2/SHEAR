@@ -59,9 +59,13 @@ describe('summarizeAllExercises', () => {
     expect(Object.fromEntries(summary.muscles.map(({ muscle, sets }) => [muscle, Math.round(sets * 1000) / 1000]))).toEqual({
       quads: 2.667, glutes: 2.333, back: 2, biceps: 1, hamstrings: 0.5,
     })
+    // One calf set over three training weeks would read 0 beside a bar.
+    const calves = session({ workoutId: 'w3', exerciseId: 'my-calf', exerciseSource: 'user', finishedAt: at('2026-11-10'), totalSets: 1, muscleGroups: ['calves'], category: 'legs' })
+    expect(summarizeAllExercises([...sessions, calves], 30, anchor).muscles.map(({ muscle }) => muscle)).not.toContain('calves')
   })
 
   it('shows each exercise best set and its change in kg, or in reps when the weight held', () => {
+    expect(summary.exercisesCompared).toBe(true)
     const rows = Object.fromEntries(summary.exercises.map((row) => [row.key, [row.sessions, row.best, row.change]]))
     expect(summary.exercises[0]!.key).toBe('global:squat')
     expect(rows['global:squat']).toEqual([3, { weight: 105, reps: 3 }, { unit: 'kg', value: 5 }])
@@ -96,7 +100,7 @@ describe('summarizeAllExercises', () => {
   it('has no average or change in the first week and counts this week instead', () => {
     const first = summarizeAllExercises([session({ workoutId: 'n1', exerciseId: 'squat', finishedAt: at('2026-11-17'), bestSetWeight: 60, bestSetReps: 5, totalVolume: 900, totalSets: 2 })], 90, anchor)
     expect(first.weeks).toEqual([expect.objectContaining({ volume: 900, current: true })])
-    expect([first.averageVolume, first.averageDelta, first.muscleBasis]).toEqual([null, null, 'thisWeek'])
+    expect([first.averageVolume, first.averageDelta, first.muscleBasis, first.exercisesCompared]).toEqual([null, null, 'thisWeek', false])
     expect(first.muscles).toEqual([{ muscle: 'quads', sets: 2 }, { muscle: 'glutes', sets: 1 }])
   })
 

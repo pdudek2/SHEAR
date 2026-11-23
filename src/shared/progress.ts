@@ -139,6 +139,8 @@ export interface AllExercisesSummary {
   comparable: boolean
   // Percent against the same mean in the period before; null under 2 training weeks on either side or over a mean of 0.
   averageDelta: number | null
+  // Some exercise in the range was also done in the period before, so best sets have something to compare with.
+  exercisesCompared: boolean
   workouts: number
   previousWorkouts: number
   // Per training week, or for the current week alone while the range has no training week.
@@ -214,7 +216,8 @@ export function summarizeAllExercises(loaded: ProgressSessionLite[], rangeDays: 
     muscles.forEach((muscle, index) => muscleSets.set(muscle, (muscleSets.get(muscle) ?? 0) + session.totalSets * (index === 0 ? 1 : 0.5)))
   }
   const divisor = Math.max(training.length, 1)
-  const muscles = [...muscleSets].map(([muscle, sets]) => ({ muscle, sets: sets / divisor })).sort((a, b) => b.sets - a.sets || a.muscle.localeCompare(b.muscle))
+  // A muscle that rounds to 0 sets would show 0 beside a visible bar.
+  const muscles = [...muscleSets].map(([muscle, sets]) => ({ muscle, sets: sets / divisor })).filter(({ sets }) => Math.round(sets) > 0).sort((a, b) => b.sets - a.sets || a.muscle.localeCompare(b.muscle))
 
   const rows = new Map<string, ExerciseSummaryRow & { previous: BestSet | null; workouts: Set<string> }>()
   for (const session of [...sessions].sort((a, b) => a.finishedAt - b.finishedAt)) {
@@ -239,12 +242,13 @@ export function summarizeAllExercises(loaded: ProgressSessionLite[], rangeDays: 
       : row.best.reps === null || previous.reps === null ? null
         : { unit: 'reps' as const, value: row.best.reps - previous.reps },
   }))
+  const exercisesCompared = [...rows.values()].some(({ workouts, previous }) => workouts.size > 0 && previous !== null)
   exercisesInRange.sort((a, b) => b.sessions - a.sessions || a.exerciseName.localeCompare(b.exerciseName, 'en-US') || a.key.localeCompare(b.key))
 
   return {
     weeks, trainingWeeks: training.length, averageVolume, headlineVolume, comparable, averageDelta,
     workouts: workoutsIn(rangeStart, Infinity), previousWorkouts: workoutsIn(previousStart, rangeStart),
-    muscles, muscleBasis, exercises: exercisesInRange,
+    muscles, muscleBasis, exercises: exercisesInRange, exercisesCompared,
   }
 }
 

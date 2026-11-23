@@ -64,13 +64,15 @@ function ProgressContent({ uid }: { uid: string }) {
   const records = snapshot?.records?.records ?? []
   const currentSessions = useMemo(() => sessions.filter((session) => session.finishedAt >= fetchedAt - rangeDays * 86_400_000), [sessions, fetchedAt, rangeDays])
   const summary = useMemo(() => summarizeAllExercises(sessions, rangeDays, fetchedAt), [sessions, rangeDays, fetchedAt])
+  const compared = summary.exercisesCompared
   const strength = useMemo(() => aggregateStrengthProgression(currentSessions), [currentSessions])
   const chartable = new Set(strength.series.map((series) => series.key))
   const selectedStrengthKey = strengthKey && chartable.has(strengthKey) ? strengthKey : defaultStrengthKey(strength.series)
   const selectedStrength = strength.series.find((series) => series.key === selectedStrengthKey)
   const strengthPoints = selectedStrengthKey ? strength.data.filter((point) => Number(point[selectedStrengthKey] ?? 0) > 0) : []
   const strengthValues = strengthPoints.map((point) => Number(point[selectedStrengthKey!] ?? 0))
-  const inspectedIndex = inspected?.key === selectedStrengthKey && inspected.index < strengthValues.length ? inspected.index : null
+  const strengthChartKey = `${selectedStrengthKey}:${rangeDays}`
+  const inspectedIndex = inspected?.key === strengthChartKey && inspected.index < strengthValues.length ? inspected.index : null
   const shownStrength = strengthValues[inspectedIndex ?? strengthValues.length - 1] ?? 0
   const exerciseNames = new Map<string, number>()
   strength.series.forEach((series) => exerciseNames.set(series.exerciseName, (exerciseNames.get(series.exerciseName) ?? 0) + 1))
@@ -121,7 +123,7 @@ function ProgressContent({ uid }: { uid: string }) {
             <Text style={styles.heroLabel}>{summary.averageDelta !== null && <><Text style={styles.heroStrong}>{formatPercentChange(summary.averageDelta)}</Text> vs {previousPeriodLabel(rangeDays)}</>}</Text>
             <Text style={[styles.heroLabel, styles.heroStrong]}>{formatCountChange(summary.workouts - summary.previousWorkouts)}</Text>
           </View>}
-          <View style={styles.weekly}><WeeklyVolumeChart weeks={summary.weeks} trainingWeeks={summary.trainingWeeks} average={summary.averageVolume} units={units} width={chartWidth} /></View>
+          <View style={styles.weekly}><WeeklyVolumeChart key={rangeDays} weeks={summary.weeks} trainingWeeks={summary.trainingWeeks} average={summary.averageVolume} units={units} width={chartWidth} /></View>
         </View>
         {summary.muscles.length > 0 && <View>
           <View style={styles.panelHead}><Text accessibilityRole="header" style={styles.panelTitle}>Sets per muscle group</Text><Text style={styles.panelBadge}>{summary.muscleBasis === 'average' ? 'avg / training week' : 'this week'}</Text></View>
@@ -129,11 +131,11 @@ function ProgressContent({ uid }: { uid: string }) {
           <Text style={styles.note}>Assisting muscles count half.</Text>
         </View>}
         <View>
-          <View style={styles.panelHead}><Text accessibilityRole="header" style={styles.panelTitle}>Exercises</Text><Text style={styles.panelBadge}>best set · vs {previousPeriodLabel(rangeDays)}</Text></View>
+          <View style={styles.panelHead}><Text accessibilityRole="header" style={styles.panelTitle}>Exercises</Text><Text style={styles.panelBadge}>best set{compared ? ` · vs ${previousPeriodLabel(rangeDays)}` : ''}</Text></View>
           {summary.exercises.map((row) => {
             const change = formatSetChange(row.change, units)
             const label = `${row.exerciseName}, best set ${formatBestSet(row.best, units)}${change ? `, ${change}` : ''}`
-            const cells = <><Text numberOfLines={1} style={styles.exerciseName}>{row.exerciseName}</Text><Text style={styles.exerciseBest}>{formatBestSet(row.best, units)}</Text><Text numberOfLines={1} style={styles.exerciseChange}>{change}</Text></>
+            const cells = <><Text numberOfLines={1} style={styles.exerciseName}>{row.exerciseName}</Text><Text style={styles.exerciseBest}>{formatBestSet(row.best, units)}</Text>{compared && <Text numberOfLines={1} style={styles.exerciseChange}>{change}</Text>}</>
             return chartable.has(row.key)
               ? <Pressable key={row.key} accessibilityRole="button" accessibilityLabel={label} accessibilityHint="Shows this exercise in the weight chart" onPress={() => chartExercise(row.key)} style={styles.exerciseRow}>{cells}<Icon name="chevron-right" size={16} color={colors.mutedSoft} /></Pressable>
               : <View key={row.key} accessible accessibilityLabel={label} style={styles.exerciseRow}>{cells}<View style={styles.chevronSpace} /></View>
@@ -148,7 +150,7 @@ function ProgressContent({ uid }: { uid: string }) {
           </View>}
           {!selectedStrength ? <Text style={styles.muted}>No recorded weights above 0 {units} in this range. Add a set weight to see progression.</Text>
             : strengthPoints.length < 3 ? <><Text style={styles.muted}>Chart needs {3 - strengthPoints.length} more {pluralize(3 - strengthPoints.length, 'day', 'days')} with recorded weight.</Text><View accessibilityLabel={`${strengthPoints.length} of 3 days for the chart`} style={styles.markers}>{[0, 1, 2].map((index) => <View key={index} style={[styles.marker, index < strengthPoints.length && styles.markerActive]} />)}</View></>
-              : <><View style={styles.strengthInsight}><Text accessibilityLiveRegion="polite" style={styles.strengthLatest}>{inspectedIndex === null ? 'Latest' : `${strengthPoints[inspectedIndex]?.date} ·`} {kgToDisplayWeight(shownStrength, units)} {units}</Text><Text style={styles.strengthDelta}>{strengthDeltaLabel(strengthValues[0] ?? 0, shownStrength, strengthPoints[0]?.date ?? '', units)} · max. {kgToDisplayWeight(Math.max(...strengthValues), units)} {units}</Text></View><StrengthChart points={strengthPoints} keyName={selectedStrengthKey!} units={units} width={chartWidth} onInspect={(index) => setInspected({ key: selectedStrengthKey!, index })} /></>}
+              : <><View style={styles.strengthInsight}><Text accessibilityLiveRegion="polite" style={styles.strengthLatest}>{inspectedIndex === null ? 'Latest' : `${strengthPoints[inspectedIndex]?.date} ·`} {kgToDisplayWeight(shownStrength, units)} {units}</Text><Text style={styles.strengthDelta}>{strengthDeltaLabel(strengthValues[0] ?? 0, shownStrength, strengthPoints[0]?.date ?? '', units)} · max. {kgToDisplayWeight(Math.max(...strengthValues), units)} {units}</Text></View><StrengthChart key={strengthChartKey} points={strengthPoints} keyName={selectedStrengthKey!} units={units} width={chartWidth} onInspect={(index) => setInspected({ key: strengthChartKey, index })} /></>}
         </View>
       </View>}
 

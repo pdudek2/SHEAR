@@ -3260,7 +3260,7 @@ body:has(.bottom-nav[aria-hidden="true"]) {
 
 .progress-exercise-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 4.25rem 1rem;
+  grid-template-columns: minmax(0, 1fr) auto 1rem;
   column-gap: 0.625rem;
   align-items: center;
   width: 100%;
@@ -3272,6 +3272,10 @@ body:has(.bottom-nav[aria-hidden="true"]) {
   font: inherit;
   font-size: 0.9375rem;
   text-align: left;
+}
+
+.progress-exercises[data-compared] .progress-exercise-row {
+  grid-template-columns: minmax(0, 1fr) auto 4.25rem 1rem;
 }
 
 button.progress-exercise-row {

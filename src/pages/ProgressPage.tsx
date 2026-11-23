@@ -258,6 +258,7 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
     () => summarizeAllExercises(sessions, rangeDays, fetchedAt),
     [sessions, rangeDays, fetchedAt],
   )
+  const compared = summary.exercisesCompared
 
   const strengthData = useMemo(
     () => aggregateStrengthProgression(currentSessions),
@@ -432,17 +433,17 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
               </section>
             )}
 
-            <section className="progress-exercises">
+            <section className="progress-exercises" data-compared={compared || undefined}>
               <div className="progress-section-head">
                 <h2>Exercises</h2>
-                <span>best set · vs {previousPeriodLabel(rangeDays)}</span>
+                <span>best set{compared ? ` · vs ${previousPeriodLabel(rangeDays)}` : ''}</span>
               </div>
               {summary.exercises.map((row) => {
                 const cells = (
                   <>
                     <span className="progress-exercise-name">{row.exerciseName}</span>
                     <span className="progress-exercise-best tabular-nums">{formatBestSet(row.best, units)}</span>
-                    <span className="progress-exercise-change tabular-nums">{formatSetChange(row.change, units)}</span>
+                    {compared && <span className="progress-exercise-change tabular-nums">{formatSetChange(row.change, units)}</span>}
                   </>
                 )
                 return chartableKeys.has(row.key) ? (
