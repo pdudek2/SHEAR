@@ -137,7 +137,7 @@ export interface AllExercisesSummary {
   headlineVolume: number | null
   // At least 2 calendar weeks on each side, trained or not, and training from before the period before: enough to compare workout counts.
   comparable: boolean
-  // Percent against the same mean in the period before; null under 2 training weeks on either side or over a mean of 0.
+  // Percent against the same mean in the period before; null under 2 training weeks on either side or over a mean of 0. Shown on its own.
   averageDelta: number | null
   // Some exercise in the range was also done in the period before, so best sets have something to compare with.
   exercisesCompared: boolean
@@ -193,10 +193,10 @@ export function summarizeAllExercises(loaded: ProgressSessionLite[], rangeDays: 
   const full = weeks.filter(({ current }) => !current)
   const trained = new Set(sessions.filter(({ category }) => category !== 'cardio').map(({ finishedAt }) => mondayOf(finishedAt)))
   const trainedFull = full.filter(({ weekStart }) => trained.has(weekStart))
-  // The week of the first workout is usually partial, so it counts only while it is the only training week.
-  const partialWeek = firstWorkoutAt !== null && trainedFull.length > 1 && trainedFull.some(({ weekStart }) => weekStart === mondayOf(firstWorkoutAt)) ? mondayOf(firstWorkoutAt) : null
+  // The week of the first workout is usually partial, so it never counts as a training week; this week stands in meanwhile.
+  const partialWeek = firstWorkoutAt === null ? null : mondayOf(firstWorkoutAt)
   const training = trainedFull.filter(({ weekStart }) => weekStart !== partialWeek)
-  // A period before that started ahead of the first workout has nothing fair to compare with.
+  // Workout counts are sums, so they compare only once the history covers the whole period before.
   const covered = firstWorkoutAt === null || firstWorkoutAt <= previousStart
   // The period before has its own full weeks: they start inside it and end by the range start.
   const previousMonday = mondayOf(previousStart)
@@ -206,9 +206,9 @@ export function summarizeAllExercises(loaded: ProgressSessionLite[], rangeDays: 
   const averageVolume = training.length ? mean(training.map(({ volume }) => volume)) : null
   const headlineVolume = averageVolume ?? (trained.has(currentMonday) ? weekVolume.get(currentMonday) ?? 0 : null)
   const comparable = covered && full.length >= 2 && previousMondays.length >= 2
-  const previousTraining = previousMondays.filter((monday) => trained.has(monday))
+  const previousTraining = previousMondays.filter((monday) => trained.has(monday) && monday !== partialWeek)
   const previousAverage = previousTraining.length >= 2 ? mean(previousTraining.map((monday) => weekVolume.get(monday) ?? 0)) : 0
-  const averageDelta = covered && training.length >= 2 && averageVolume !== null && previousAverage > 0 ? calcDelta(averageVolume, previousAverage) : null
+  const averageDelta = training.length >= 2 && averageVolume !== null && previousAverage > 0 ? calcDelta(averageVolume, previousAverage) : null
 
   const workoutsIn = (from: number, to: number) => new Set(sessions.filter(({ finishedAt }) => finishedAt >= from && finishedAt < to).map(({ workoutId }) => workoutId)).size
 
@@ -244,12 +244,12 @@ export function summarizeAllExercises(loaded: ProgressSessionLite[], rangeDays: 
   const exercisesInRange = [...rows.values()].filter(({ workouts }) => workouts.size > 0).map(({ previous, workouts, ...row }) => ({
     ...row,
     sessions: workouts.size,
-    change: !previous || !covered ? null : row.best.weight !== previous.weight
+    change: !previous ? null : row.best.weight !== previous.weight
       ? { unit: 'kg' as const, value: Math.round((row.best.weight - previous.weight) * 1000) / 1000 }
       : row.best.reps === null || previous.reps === null ? null
         : { unit: 'reps' as const, value: row.best.reps - previous.reps },
   }))
-  const exercisesCompared = covered && [...rows.values()].some(({ workouts, previous }) => workouts.size > 0 && previous !== null)
+  const exercisesCompared = [...rows.values()].some(({ workouts, previous }) => workouts.size > 0 && previous !== null)
   exercisesInRange.sort((a, b) => b.sessions - a.sessions || a.exerciseName.localeCompare(b.exerciseName, 'en-US') || a.key.localeCompare(b.key))
 
   return {

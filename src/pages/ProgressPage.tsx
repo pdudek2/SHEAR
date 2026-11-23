@@ -401,7 +401,7 @@ function ProgressContent({ userId }: { userId: string | undefined }) {
                     </>
                   )}
                 </p>
-                {summary.comparable && (
+                {(summary.comparable || summary.averageDelta !== null) && (
                   <p className="progress-hero-delta">
                     {summary.averageDelta !== null && <><b>{formatPercentChange(summary.averageDelta)}</b> vs {previousPeriodLabel(rangeDays)}</>}
                   </p>

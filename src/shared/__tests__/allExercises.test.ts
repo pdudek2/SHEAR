@@ -198,25 +198,29 @@ describe('summarizeAllExercises on a young account', () => {
     .filter((date) => [1, 3, 5].includes(date.getDay()) && date.getTime() < anchor)
     .map((date) => session({ workoutId: `y${date.getTime()}`, exerciseId: 'squat', finishedAt: date.getTime(), bestSetWeight: 100, bestSetReps: 8, totalVolume: 6000, totalSets: 4 }))
 
-  it('leaves out the partial week of the first workout while another training week counts', () => {
+  it('never counts the week of the first workout as a training week', () => {
     // First workout on Friday Nov 6: its week has one workout, the full week after it three.
     const young = steady('2026-11-06', 12)
-    const firstAt = young[0]!.finishedAt
-    const summary = summarizeAllExercises(young, 30, anchor, firstAt)
+    const summary = summarizeAllExercises(young, 30, anchor, young[0]!.finishedAt)
     expect([summary.averageVolume, summary.trainingWeeks]).toEqual([18000, 1])
     expect(summary.muscles[0]).toEqual({ muscle: 'quads', sets: 12 })
-    // With only the first week behind it, that week still gives the average.
+    // With only that week behind it, the headline is this week so far rather than a partial week's average.
     const first = steady('2026-11-13', 5)
-    expect(summarizeAllExercises(first, 30, anchor, first[0]!.finishedAt).averageVolume).toBe(6000)
+    const only = summarizeAllExercises(first, 30, anchor, first[0]!.finishedAt)
+    expect([only.averageVolume, only.headlineVolume, only.muscleBasis]).toEqual([null, 6000, 'thisWeek'])
   })
 
-  it('compares nothing when the first workout came after the period before began', () => {
-    // 45 days of the same training: the period before holds only its last 15 days.
+  it('compares best sets and the weekly average without the first week, and workout counts only over a covered period', () => {
+    // 45 days of the same training: one training week before the range once the first is left out.
     const young = steady('2026-10-05', 44)
     const summary = summarizeAllExercises(young, 30, anchor, young[0]!.finishedAt)
-    expect([summary.comparable, summary.averageDelta, summary.exercisesCompared]).toEqual([false, null, false])
-    expect(summary.exercises.map(({ change }) => change)).toEqual([null])
-    // Training from before the period before compares as usual.
+    expect([summary.comparable, summary.averageDelta, summary.exercisesCompared]).toEqual([false, null, true])
+    expect(summary.exercises.map(({ change }) => change)).toEqual([{ unit: 'reps', value: 0 }])
+    // About 8 weeks: three training weeks before the range, so the average compares, the workout count still does not.
+    const older = steady('2026-09-25', 60)
+    const eight = summarizeAllExercises(older, 30, anchor, older[0]!.finishedAt)
+    expect([eight.comparable, eight.averageDelta]).toEqual([false, 0])
+    // Training from before the period before compares workout counts as usual.
     expect(summarizeAllExercises(young, 30, anchor, at('2026-09-01')).comparable).toBe(true)
   })
 })
