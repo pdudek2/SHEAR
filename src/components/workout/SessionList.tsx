@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { MEMBER_LETTERS, usePreviousSets } from './sessionHelpers'
 import OverloadHint from '../OverloadHint'
 import type { SessionHint } from '../../shared/progression'
-import { Check, ChevronDown, Ellipsis, Plus } from 'lucide-react'
+import { Check, ChevronDown, Ellipsis, Plus, X } from 'lucide-react'
 import type { ActiveWorkout, WorkoutExercise } from '../../store/workoutStore'
 import type { Units } from '../../lib/userProfile'
 import { pluralize } from '../../lib/pluralize'
@@ -69,7 +69,7 @@ export function CollapsedGroup({ session, indices, onOpen }: { session: ActiveWo
 }
 
 // A pair or circuit as one block: its members once, then every set in the order it is done, round by round.
-export function GroupBlock({ session, indices, currentIndex, panelSet, units, userId, userExercises, metaOf, inlinePanel, hint, drawnSetId, onSelect, onToggle, onRemove, onAddRound }: {
+export function GroupBlock({ session, indices, currentIndex, panelSet, units, userId, userExercises, metaOf, inlinePanel, hint, drawnSetId, onSelect, onToggle, onRemove, onRemoveSet, onAddRound }: {
   session: ActiveWorkout
   indices: number[]
   currentIndex: number
@@ -85,6 +85,7 @@ export function GroupBlock({ session, indices, currentIndex, panelSet, units, us
   onSelect: (exerciseIndex: number, setIndex: number) => void
   onToggle: (exerciseIndex: number, setIndex: number) => void
   onRemove: (exerciseIndex: number) => void
+  onRemoveSet: (exerciseIndex: number, setIndex: number) => void
   onAddRound: (indices: number[]) => void
 }) {
   const members = indices.map((index) => session.exercises[index]!)
@@ -139,6 +140,10 @@ export function GroupBlock({ session, indices, currentIndex, panelSet, units, us
           <span className="workout-set-previous">{last}</span>
           <span className="workout-set-today">{setPairLabel(set, units)}</span>
         </button>
+        <button type="button" className="workout-set-remove" style={{ color: 'var(--muted-soft)' }} onClick={() => onRemoveSet(member, setIndex)}
+          aria-label={`Remove set ${label} for ${exercise.name}`}>
+          <X size={15} />
+        </button>
       </div>,
     )
     if (current && panel) items.push(panel)
@@ -165,7 +170,7 @@ export function GroupBlock({ session, indices, currentIndex, panelSet, units, us
         )
       })}
       {hint && hinted && hinted.sets.some((set) => !set.done) && (
-        <OverloadHint hint={{ ...hint.suggestion, label: `${letter(currentIndex)} · ${hinted.name}: ${hint.suggestion.label}` }} onApply={hint.onApply} onDismiss={hint.onDismiss} />
+        <OverloadHint hint={hint.suggestion} onApply={hint.onApply} onDismiss={hint.onDismiss} />
       )}
       <div className="workout-set-header" aria-hidden="true">
         <span>Set</span>

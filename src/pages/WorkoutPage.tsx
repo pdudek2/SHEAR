@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, ChevronLeft, ChevronRight, Ellipsis, Plus, Trash2 } from 'lucide-react'
@@ -280,11 +281,25 @@ export default function WorkoutPage() {
         const setAt = at >= 0 ? exercises[at]!.sets.findIndex((set, index) => (setKey ? set.clientId === setKey : index === setIndex)) : -1
         if (setAt >= 0) toggleSet(at, setAt, true)
       }
-      if (unweighted) toast('No weight entered. Log this set without weight?', { id: 'log-without-weight', action: { label: 'Log without weight', onClick: logAnyway } })
+      const enterWeight = () => {
+        flushSync(() => {
+          setManualExerciseClientId(exerciseKey)
+          setSelectedSet({ exerciseId: exerciseKey, setId: setKey ?? String(setIndex) })
+        })
+        // Sonner hands focus back to the element from before the toast when focus leaves it; let that happen first.
+        const inToast = document.activeElement instanceof HTMLElement && document.activeElement.closest('[data-sonner-toaster]')
+        if (inToast) (document.activeElement as HTMLElement).blur()
+        document.querySelector<HTMLInputElement>('.workout-set-panel input[role="spinbutton"]')?.focus()
+      }
+      if (unweighted) toast('No weight entered. Log this set without weight?', {
+        id: 'log-without-weight',
+        action: { label: 'Log without weight', onClick: logAnyway },
+        cancel: { label: 'Enter weight', onClick: enterWeight },
+      })
       else if (slip) toast(`${slip.title} ${slip.message}`, {
         id: 'log-weight-slip',
         action: { label: 'Log anyway', onClick: logAnyway },
-        cancel: { label: 'Fix', onClick: () => document.querySelector<HTMLInputElement>('.workout-set-panel input[role="spinbutton"]')?.focus() },
+        cancel: { label: 'Fix', onClick: enterWeight },
       })
       return
     }
@@ -308,6 +323,13 @@ export default function WorkoutPage() {
       if ('vibrate' in navigator) navigator.vibrate(12)
     } else {
       useWorkoutStore.getState().clearRestTimer()
+      // The set taken back is the one to redo, also when a pair has moved on to the next round.
+      const exercise = currentActive?.exercises[exerciseIndex]
+      if (exercise && currentSet) {
+        const clientId = getExerciseClientId(exercise, exerciseIndex)
+        setManualExerciseClientId(clientId)
+        setSelectedSet({ exerciseId: clientId, setId: currentSet.clientId ?? String(setIndex) })
+      }
     }
   }, [histories, units, userExercises])
 
@@ -1170,6 +1192,7 @@ export default function WorkoutPage() {
                         onSelect={selectMemberSet}
                         onToggle={handleToggleSet}
                         onRemove={handleRemoveExercise}
+                        onRemoveSet={handleRemoveSet}
                         onAddRound={(indices) => {
                           indices.forEach((index) => useWorkoutStore.getState().addSet(index))
                           if ('vibrate' in navigator) navigator.vibrate(8)
