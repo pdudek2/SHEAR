@@ -32,6 +32,7 @@ import { getTemplate, type WorkoutTemplate } from '../lib/templateService'
 import { getReadiness } from '../lib/readinessService'
 import { computeReadinessScore, todayKey } from '../shared/readiness'
 import { buildProgression, planTarget, sessionHint, type ProgressionSession } from '../shared/progression'
+import { workoutVolume } from '../shared/progress'
 import { exercises as exerciseDb } from '../data/exercises'
 import { isActiveSessionStale } from '../lib/sessionDuration'
 import WorkoutSetPanel from '../components/workout/WorkoutSetPanel'
@@ -44,7 +45,7 @@ import {
 import { useMobileInteraction } from '../components/MobileInteractionProvider'
 import { ElapsedSessionTimer } from '../components/ActiveWorkoutReturnBar'
 
-import { WORKOUT_LABELS, EQUIPMENT_LABELS, parseWeight, parseReps, calcSetVolume, focusExerciseIndex, nextGroupMember, panelSetIndex, removeSetMessage, restAfterSet, sessionBlocks, upNextQueue } from '../shared/workoutDisplay'
+import { WORKOUT_LABELS, EQUIPMENT_LABELS, parseWeight, parseReps, focusExerciseIndex, nextGroupMember, panelSetIndex, removeSetMessage, restAfterSet, sessionBlocks, upNextQueue } from '../shared/workoutDisplay'
 import { catalogueMeta, sessionRoles } from '../shared/nextSessionRecommendation'
 
 type PendingSetRemoval = { exerciseClientId: string; setClientId: string; done: boolean }
@@ -789,11 +790,10 @@ export default function WorkoutPage() {
   const completedSets = active.exercises.reduce((sum, exercise) => (
     sum + exercise.sets.filter((set) => set.done && parseReps(set.reps) > 0).length
   ), 0)
-  const totalVolume = active.exercises.reduce((sum, exercise) => (
-    sum + exercise.sets.reduce((innerSum, set) => (
-      set.done ? innerSum + calcSetVolume(set) : innerSum
-    ), 0)
-  ), 0)
+  const totalVolume = workoutVolume(active.exercises.map((exercise) => ({
+    ...exercise,
+    sets: exercise.sets.filter((set) => set.done).map((set) => ({ weight: parseWeight(set.weight), reps: parseReps(set.reps) })),
+  })))
   const strongestSet = active.exercises.reduce((top, exercise) => {
     const next = exercise.sets.reduce((currentTop, set) => (
       set.done ? Math.max(currentTop, parseWeight(set.weight)) : currentTop

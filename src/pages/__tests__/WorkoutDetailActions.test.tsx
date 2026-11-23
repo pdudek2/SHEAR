@@ -723,6 +723,23 @@ describe('WorkoutDetailPage delete action', () => {
     expect(await screen.findByText('History workouts')).toBeInTheDocument()
   })
 
+  it('shows no volume for assistance, read or edited', async () => {
+    const assisted: WorkoutSummary = { ...workout, exercises: [...workout.exercises, {
+      exerciseId: 'assisted-pull-up', exerciseSource: 'global', name: 'Assisted Pull-up', sets: [{ weight: 30, reps: 8 }],
+    }] }
+    mocks.getWorkout.mockResolvedValue(assisted)
+    mocks.readWorkoutMutationState.mockResolvedValue({ status: 'available', baseline: 'a'.repeat(64), workout: assisted, operation: null, projection: 'ready' })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Assisted Pull-up/ }))
+    expect(screen.getByRole('cell', { name: '30' }).closest('tr')).toHaveTextContent(/^1308—$/)
+    expect(screen.getAllByText('400 kg').length).toBeGreaterThan(0)
+    expect(screen.queryByText('240')).not.toBeInTheDocument()
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'Edit workout' })[0]) })
+    expect(screen.getByRole('spinbutton', { name: /^Weight, Assisted Pull-up, set 1/ })).toBeInTheDocument()
+    expect(screen.queryByText('240')).not.toBeInTheDocument()
+  })
+
   it('shows lbs while a no-op save preserves the original kg payload exactly', async () => {
     useProfileStore.getState().setProfile('user-1', {
       displayName: 'Tester', weeklyGoal: 3, primaryGoal: 'strength', units: 'lbs', createdAt: 1,

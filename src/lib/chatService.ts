@@ -237,8 +237,20 @@ function getModelsApiUrl(): string {
     : `http://${host}:3000/api/ai-models`
 }
 
+// Two allowance reads at once make the server's rate-limit transactions wait on each other, so an account shares one.
+const quotaReads = new Map<string, Promise<CoachQuota>>()
+
 // Today's shared-key allowance, and whether the server has a key at all.
-export async function fetchCoachQuota(): Promise<CoachQuota> {
+export function fetchCoachQuota(): Promise<CoachQuota> {
+  const uid = auth.currentUser?.uid ?? ''
+  const running = quotaReads.get(uid)
+  if (running) return running
+  const read = requestCoachQuota().finally(() => { quotaReads.delete(uid) })
+  quotaReads.set(uid, read)
+  return read
+}
+
+async function requestCoachQuota(): Promise<CoachQuota> {
   const idToken = await getAuthenticatedUserToken()
   const response = await fetch(getModelsApiUrl(), {
     method: 'POST',

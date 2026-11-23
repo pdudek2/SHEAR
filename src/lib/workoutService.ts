@@ -19,6 +19,8 @@ import { ApiRejectedError, callAuthedApi } from './authedApi'
 import { clearWorkoutDeleteRecovery, readWorkoutDeleteRecovery, writeWorkoutDeleteRecovery } from './workoutDeleteRecovery'
 import { confirmedQuery } from './confirmedQuery'
 import { parseCompressionRecord, parseGroup, type CompressionRecord } from '../shared/compressionRecord'
+import { workoutVolume } from '../shared/progress'
+import { startOfWeek } from '../shared/week'
 
 interface WorkoutSetSummary {
   weight: number
@@ -77,6 +79,8 @@ export async function getRecentWorkouts(uid: string, count = 20): Promise<Workou
 
 export async function getFirstWorkoutStartedAt(uid: string): Promise<number | null> {
   const snap = confirmedQuery(await getDocs(query(collection(db, 'workouts'), where('userId', '==', uid), orderBy('startedAt', 'asc'), limit(1))))
+  // Offline, the earliest cached workout need not be the first one.
+  if (snap.metadata?.fromCache) throw new Error('The first workout could not be confirmed.')
   return snap.docs[0] ? normalizeWorkoutSummary(snap.docs[0].id, snap.docs[0].data()).startedAt : null
 }
 
@@ -207,19 +211,14 @@ export async function retryPendingMaterializations(
 }
 
 export function countWeeklyWorkouts(workouts: WorkoutSummary[]): number {
-  const startOfWeek = new Date()
-  startOfWeek.setHours(0, 0, 0, 0)
-  startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7))
-  return workouts.filter((workout) => workout.startedAt >= startOfWeek.getTime()).length
+  const weekStart = startOfWeek(new Date()).getTime()
+  return workouts.filter((workout) => workout.startedAt >= weekStart).length
 }
 
 export { calcStreak } from '../shared/streak'
 
 export function calcVolume(workout: WorkoutSummary): number {
-  return workout.exercises.reduce(
-    (total, exercise) => total + exercise.sets.reduce((sum, set) => sum + set.weight * set.reps, 0),
-    0
-  )
+  return workoutVolume(workout.exercises)
 }
 
 function normalizeWorkoutSummary(id: string, raw: unknown): WorkoutSummary {

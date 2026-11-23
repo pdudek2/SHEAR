@@ -320,6 +320,8 @@ export async function readRecentWorkouts(uid: string, count: number): Promise<Re
 export async function readFirstWorkoutAt(uid: string): Promise<number | null> {
   const { firestore } = await getServices()
   const snapshot = await getDocs(query(collection(firestore, 'workouts'), where('userId', '==', uid), orderBy('startedAt', 'asc'), limit(1)))
+  // Offline, the earliest cached workout need not be the first one.
+  if (snapshot.metadata.fromCache) throw new Error('The first workout could not be confirmed.')
   return snapshot.docs[0] ? parseSavedWorkout(snapshot.docs[0].id, uid, snapshot.docs[0].data()).startedAt : null
 }
 

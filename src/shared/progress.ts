@@ -1,9 +1,7 @@
 import { exercises, type Category } from '../../data/exercises'
 import { kgToDisplayWeight, type WeightUnits } from './weightUnits'
-import { addLocalDays } from './week'
+import { addLocalDays, startOfWeek } from './week'
 
-const MUSCLE_KEYS = ['chest', 'shoulders', 'triceps', 'back', 'biceps', 'forearms', 'quads', 'hamstrings', 'glutes', 'adductors', 'calves', 'core']
-export const PROGRESS_MUSCLE_COLORS: Record<string, string> = Object.fromEntries(MUSCLE_KEYS.map((key) => [key, '#a89f98']))
 export const PROGRESS_MUSCLE_LABELS: Record<string, string> = {
   chest: 'Chest', back: 'Back', shoulders: 'Shoulders', biceps: 'Biceps', triceps: 'Triceps', quads: 'Quads',
   hamstrings: 'Hamstrings', glutes: 'Glutes', adductors: 'Adductors', core: 'Core', calves: 'Calves', forearms: 'Forearms',
@@ -20,6 +18,11 @@ export interface ProgressSessionLite {
   bestSetWeight: number
   exerciseName: string
   muscleGroups: string[]
+  // Older documents may lack these: unknown reps stay absent and the category of a global exercise comes from the catalogue.
+  bestSetReps?: number
+  category?: string | null
+  // Assisted exercises only: the set with the least assistance, since the stored best set has the most.
+  leastAssisted?: { weight: number; reps: number }
 }
 
 export interface RecordSummary {
@@ -44,155 +47,222 @@ export interface ProgressRecordsResult {
   truncated: boolean
 }
 
-export interface WeeklyPoint {
-  weekLabel: string  // "7 kwi"
-  weekStart: number  // ms Monday 00:00 local
-  volume: number
-  sessions: number
-}
-
-export interface MuscleBalancePoint {
-  muscle: string
-  count: number
-}
-
-// Monday 00:00:00.000 local dla danej daty
-function getWeekMonday(date: Date): Date {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  const day = d.getDay()
-  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
-  return d
-}
-
-// ── Aggregations (pure, client-side) ─────────────────────────────────────────
-
-export function aggregateWeeklyVolume(
-  sessions: ProgressSessionLite[],
-  weeks = 12,
-  anchorMs = Date.now(),
-): WeeklyPoint[] {
-  const now = new Date(anchorMs)
-  const buckets = new Map<number, WeeklyPoint>()
-
-  // Wygeneruj puste buckety dla ostatnich `weeks` tygodni
-  for (let i = weeks - 1; i >= 0; i--) {
-    const monday = getWeekMonday(addLocalDays(now, -i * 7))
-    const label = monday.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
-    buckets.set(monday.getTime(), { weekStart: monday.getTime(), weekLabel: label, volume: 0, sessions: 0 })
-  }
-
-  // Deduplikuj sesje per workout (jeden trening = jedna sesja w wykresie)
-  const seenWorkouts = new Set<string>()
-  const workoutVolume = new Map<string, number>()
-
-  for (const s of sessions) {
-    if (!seenWorkouts.has(s.workoutId)) {
-      seenWorkouts.add(s.workoutId)
-      workoutVolume.set(s.workoutId, 0)
-    }
-    workoutVolume.set(s.workoutId, (workoutVolume.get(s.workoutId) ?? 0) + s.totalVolume)
-  }
-
-  // Przypisz wolumen do tygodnia
-  const assignedWorkouts = new Set<string>()
-  for (const s of sessions) {
-    if (assignedWorkouts.has(s.workoutId)) continue
-    assignedWorkouts.add(s.workoutId)
-
-    const monday = getWeekMonday(new Date(s.finishedAt))
-    const key = monday.getTime()
-    const bucket = buckets.get(key)
-    if (!bucket) continue
-
-    bucket.volume += workoutVolume.get(s.workoutId) ?? 0
-    bucket.sessions += 1
-  }
-
-  return [...buckets.values()]
-}
-
-export function withoutLeadingEmptyWeeks(points: WeeklyPoint[]): WeeklyPoint[] {
-  const first = points.findIndex(({ volume }) => volume > 0)
-  return first > 0 ? points.slice(first) : points
-}
-
-export function aggregateMuscleBalance(
-  sessions: ProgressSessionLite[],
-  topN = 8,
-): MuscleBalancePoint[] {
-  const counts = new Map<string, number>()
-
-  for (const s of sessions) {
-    for (const muscle of s.muscleGroups) {
-      counts.set(muscle, (counts.get(muscle) ?? 0) + 1)
-    }
-  }
-
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, topN)
-    .map(([muscle, count]) => ({ muscle, count }))
-}
-
-// ── Period Comparison ───────────────────────────────────────────────────────
-
-export interface PeriodComparison {
-  currentSessions: number
-  previousSessions: number
-  sessionsDelta: number
-  currentVolume: number
-  previousVolume: number
-  volumeDelta: number
-  currentAvgVolume: number
-  previousAvgVolume: number
-  avgVolumeDelta: number
-}
-
 function calcDelta(current: number, previous: number): number {
   if (previous === 0) return current > 0 ? 100 : 0
   return ((current - previous) / previous) * 100
 }
 
-function countUniqueWorkouts(sessions: ProgressSessionLite[]): { count: number; volume: number } {
-  const seen = new Set<string>()
-  let volume = 0
-  for (const s of sessions) {
-    if (!seen.has(s.workoutId)) {
-      seen.add(s.workoutId)
-    }
-    volume += s.totalVolume
-  }
-  return { count: seen.size, volume }
+// ── All exercises ───────────────────────────────────────────────────────────
+
+const DAY_MS = 86_400_000
+const ASSISTED = new Set(['assisted-pull-up'])
+const catalogue = new Map(exercises.map((exercise) => [exercise.id, exercise]))
+
+export function isAssistedExercise(exerciseId: string | undefined, exerciseSource: 'global' | 'user' | undefined): boolean {
+  return exerciseSource === 'global' && !!exerciseId && ASSISTED.has(exerciseId)
 }
 
-export function aggregatePeriodComparison(
-  sessions: ProgressSessionLite[],
-  rangeDays: number,
-  anchorMs = Date.now(),
-): PeriodComparison {
-  const cutoffMs = anchorMs - rangeDays * 86_400_000
-  const previousCutoffMs = cutoffMs - rangeDays * 86_400_000
-  const current = sessions.filter((s) => s.finishedAt >= cutoffMs)
-  const previous = sessions.filter((s) => s.finishedAt >= previousCutoffMs && s.finishedAt < cutoffMs)
+// The weight of an assisted exercise is help, not load, so it never counts as volume.
+export function countsTowardVolume(exerciseId: string | undefined, exerciseSource: 'global' | 'user' | undefined): boolean {
+  return !isAssistedExercise(exerciseId, exerciseSource)
+}
 
-  const cur = countUniqueWorkouts(current)
-  const prev = countUniqueWorkouts(previous)
+export function workoutVolume(exercises: readonly { exerciseId?: string; exerciseSource?: 'global' | 'user'; sets: readonly { weight: number; reps: number }[] }[]): number {
+  return exercises.reduce((total, { exerciseId, exerciseSource, sets }) => countsTowardVolume(exerciseId, exerciseSource)
+    ? total + sets.reduce((sum, { weight, reps }) => sum + weight * reps, 0)
+    : total, 0)
+}
 
-  const curAvg = cur.count > 0 ? cur.volume / cur.count : 0
-  const prevAvg = prev.count > 0 ? prev.volume / prev.count : 0
+// Reads the optional fields of an `exerciseSessions` document; old or odd values fall back instead of failing the load.
+export function progressExtras(data: Record<string, unknown>, exerciseId: string, exerciseSource: 'global' | 'user'): Pick<ProgressSessionLite, 'bestSetReps' | 'category' | 'leastAssisted'> {
+  const finite = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+  let leastAssisted: { weight: number; reps: number } | undefined
+  if (isAssistedExercise(exerciseId, exerciseSource) && Array.isArray(data.sets)) {
+    for (const raw of data.sets as unknown[]) {
+      const set = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+      const weight = finite(set.weight)
+      const reps = finite(set.reps)
+      if (weight === null || reps === null || reps === 0) continue
+      if (!leastAssisted || better({ weight, reps }, leastAssisted, true)) leastAssisted = { weight, reps }
+    }
+  }
+  // Documents written before `bestSetReps` existed: take the reps of the heaviest stored set, or leave them unknown.
+  let bestSetReps = finite(data.bestSetReps)
+  if (bestSetReps === null && Array.isArray(data.sets)) {
+    const heaviest = finite(data.bestSetWeight)
+    for (const raw of data.sets as unknown[]) {
+      const set = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+      const reps = finite(set.reps)
+      if (reps !== null && finite(set.weight) === heaviest && reps > (bestSetReps ?? -1)) bestSetReps = reps
+    }
+  }
+  return {
+    ...(bestSetReps !== null ? { bestSetReps } : {}),
+    category: typeof data.category === 'string' ? data.category : (exerciseSource === 'global' ? catalogue.get(exerciseId)?.category : undefined) ?? null,
+    ...(leastAssisted ? { leastAssisted } : {}),
+  }
+}
+
+export interface SummaryWeek {
+  weekStart: number
+  weekLabel: string
+  volume: number
+  current: boolean
+}
+
+export interface BestSet {
+  weight: number
+  // Null when an old document did not record it.
+  reps: number | null
+}
+
+export interface ExerciseSummaryRow {
+  key: string
+  exerciseId: string
+  exerciseSource: 'global' | 'user'
+  exerciseName: string
+  sessions: number
+  best: BestSet
+  assisted: boolean
+  // kg when the best weight moved, otherwise reps; null without sessions in the previous period or with unknown reps.
+  change: { unit: 'kg' | 'reps'; value: number } | null
+}
+
+export interface AllExercisesSummary {
+  weeks: SummaryWeek[]
+  // Full weeks with training other than cardio; the averages cover only these.
+  trainingWeeks: number
+  averageVolume: number | null
+  // The average, else this week when it has training, else nothing to show.
+  headlineVolume: number | null
+  // At least 2 calendar weeks on each side, trained or not, and training from before the period before: enough to compare workout counts.
+  comparable: boolean
+  // Percent against the same mean in the period before; null under 2 training weeks on either side or over a mean of 0. Shown on its own.
+  averageDelta: number | null
+  // Some exercise in the range was also done in the period before, so best sets have something to compare with.
+  exercisesCompared: boolean
+  workouts: number
+  previousWorkouts: number
+  // Per training week, or for the current week alone while the range has no training week.
+  muscles: { muscle: string; sets: number }[]
+  muscleBasis: 'average' | 'thisWeek'
+  exercises: ExerciseSummaryRow[]
+}
+
+function bestOf(session: ProgressSessionLite, assisted: boolean): BestSet {
+  if (assisted && session.leastAssisted) return session.leastAssisted
+  return { weight: session.bestSetWeight, reps: session.bestSetReps ?? null }
+}
+
+// Server rule: heavier wins, then more reps. With assistance, less help wins.
+function better(a: BestSet, b: BestSet, assisted: boolean): boolean {
+  if (a.weight !== b.weight) return assisted ? a.weight < b.weight : a.weight > b.weight
+  return (a.reps ?? -1) > (b.reps ?? -1)
+}
+
+function mondayOf(ms: number): number {
+  return startOfWeek(new Date(ms)).getTime()
+}
+
+// firstWorkoutAt is the account's first workout, if known; without it every comparison and full week counts as before.
+export function summarizeAllExercises(loaded: ProgressSessionLite[], rangeDays: number, anchorMs = Date.now(), firstWorkoutAt: number | null = null): AllExercisesSummary {
+  const rangeStart = anchorMs - rangeDays * DAY_MS
+  const previousStart = rangeStart - rangeDays * DAY_MS
+  // A longer load, left from a wider range, must read the same as twice this range.
+  const sessions = loaded.filter(({ finishedAt }) => finishedAt >= previousStart)
+  const currentMonday = mondayOf(anchorMs)
+  const firstMonday = sessions.length ? mondayOf(Math.min(...sessions.map(({ finishedAt }) => finishedAt))) : currentMonday
+  const rangeMonday = mondayOf(rangeStart)
+  // Weeks that start inside the range, and none before the first workout.
+  const firstFullWeek = Math.max(firstMonday, rangeMonday >= rangeStart ? rangeMonday : addLocalDays(new Date(rangeMonday), 7).getTime())
+
+  const weekVolume = new Map<number, number>()
+  for (const session of sessions) {
+    if (!countsTowardVolume(session.exerciseId, session.exerciseSource)) continue
+    const monday = mondayOf(session.finishedAt)
+    weekVolume.set(monday, (weekVolume.get(monday) ?? 0) + session.totalVolume)
+  }
+  const mondays: number[] = []
+  for (let monday = firstFullWeek; monday <= currentMonday; monday = addLocalDays(new Date(monday), 7).getTime()) mondays.push(monday)
+  const weeks = mondays.map((monday) => ({
+    weekStart: monday,
+    weekLabel: new Date(monday).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+    volume: weekVolume.get(monday) ?? 0,
+    current: monday === currentMonday,
+  }))
+  const full = weeks.filter(({ current }) => !current)
+  const trained = new Set(sessions.filter(({ category }) => category !== 'cardio').map(({ finishedAt }) => mondayOf(finishedAt)))
+  const trainedFull = full.filter(({ weekStart }) => trained.has(weekStart))
+  // The week of the first workout is usually partial, so it never counts as a training week; this week stands in meanwhile.
+  const partialWeek = firstWorkoutAt === null ? null : mondayOf(firstWorkoutAt)
+  const training = trainedFull.filter(({ weekStart }) => weekStart !== partialWeek)
+  // Workout counts are sums, so they compare only once the history covers the whole period before.
+  const covered = firstWorkoutAt === null || firstWorkoutAt <= previousStart
+  // The period before has its own full weeks: they start inside it and end by the range start.
+  const previousMonday = mondayOf(previousStart)
+  const previousMondays: number[] = []
+  for (let monday = Math.max(firstMonday, previousMonday >= previousStart ? previousMonday : addLocalDays(new Date(previousMonday), 7).getTime()); addLocalDays(new Date(monday), 7).getTime() <= rangeStart; monday = addLocalDays(new Date(monday), 7).getTime()) previousMondays.push(monday)
+  const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length
+  const averageVolume = training.length ? mean(training.map(({ volume }) => volume)) : null
+  const headlineVolume = averageVolume ?? (trained.has(currentMonday) ? weekVolume.get(currentMonday) ?? 0 : null)
+  const comparable = covered && full.length >= 2 && previousMondays.length >= 2
+  const previousTraining = previousMondays.filter((monday) => trained.has(monday) && monday !== partialWeek)
+  const previousAverage = previousTraining.length >= 2 ? mean(previousTraining.map((monday) => weekVolume.get(monday) ?? 0)) : 0
+  const averageDelta = training.length >= 2 && averageVolume !== null && previousAverage > 0 ? calcDelta(averageVolume, previousAverage) : null
+
+  const workoutsIn = (from: number, to: number) => new Set(sessions.filter(({ finishedAt }) => finishedAt >= from && finishedAt < to).map(({ workoutId }) => workoutId)).size
+
+  const muscleBasis = training.length ? 'average' : 'thisWeek'
+  const muscleFrom = muscleBasis === 'average' ? firstFullWeek : currentMonday
+  const muscleTo = muscleBasis === 'average' ? currentMonday : Infinity
+  const muscleSets = new Map<string, number>()
+  for (const session of sessions) {
+    if (session.finishedAt < muscleFrom || session.finishedAt >= muscleTo || session.category === 'cardio') continue
+    if (muscleBasis === 'average' && mondayOf(session.finishedAt) === partialWeek) continue
+    const muscles = (session.exerciseSource === 'global' ? catalogue.get(session.exerciseId)?.muscles : undefined) ?? session.muscleGroups
+    muscles.forEach((muscle, index) => muscleSets.set(muscle, (muscleSets.get(muscle) ?? 0) + session.totalSets * (index === 0 ? 1 : 0.5)))
+  }
+  const divisor = Math.max(training.length, 1)
+  // A muscle that rounds to 0 sets would show 0 beside a visible bar.
+  const muscles = [...muscleSets].map(([muscle, sets]) => ({ muscle, sets: sets / divisor })).filter(({ sets }) => Math.round(sets) > 0).sort((a, b) => b.sets - a.sets || a.muscle.localeCompare(b.muscle))
+
+  const rows = new Map<string, ExerciseSummaryRow & { previous: BestSet | null; workouts: Set<string> }>()
+  for (const session of [...sessions].sort((a, b) => a.finishedAt - b.finishedAt)) {
+    const key = `${session.exerciseSource}:${session.exerciseId}`
+    const assisted = isAssistedExercise(session.exerciseId, session.exerciseSource)
+    const set = bestOf(session, assisted)
+    const row = rows.get(key) ?? { key, exerciseId: session.exerciseId, exerciseSource: session.exerciseSource, exerciseName: session.exerciseName, sessions: 0, best: { weight: 0, reps: 0 }, assisted, change: null, previous: null, workouts: new Set<string>() }
+    if (session.finishedAt < rangeStart) {
+      if (!row.previous || better(set, row.previous, assisted)) row.previous = set
+    } else {
+      if (!row.workouts.size || better(set, row.best, assisted)) row.best = set
+      row.workouts.add(session.workoutId)
+      row.exerciseName = session.exerciseName
+    }
+    rows.set(key, row)
+  }
+  const exercisesInRange = [...rows.values()].filter(({ workouts }) => workouts.size > 0).map(({ previous, workouts, ...row }) => ({
+    ...row,
+    sessions: workouts.size,
+    change: !previous ? null : row.best.weight !== previous.weight
+      ? { unit: 'kg' as const, value: Math.round((row.best.weight - previous.weight) * 1000) / 1000 }
+      : row.best.reps === null || previous.reps === null ? null
+        : { unit: 'reps' as const, value: row.best.reps - previous.reps },
+  }))
+  const exercisesCompared = [...rows.values()].some(({ workouts, previous }) => workouts.size > 0 && previous !== null)
+  exercisesInRange.sort((a, b) => b.sessions - a.sessions || a.exerciseName.localeCompare(b.exerciseName, 'en-US') || a.key.localeCompare(b.key))
 
   return {
-    currentSessions: cur.count,
-    previousSessions: prev.count,
-    sessionsDelta: calcDelta(cur.count, prev.count),
-    currentVolume: cur.volume,
-    previousVolume: prev.volume,
-    volumeDelta: calcDelta(cur.volume, prev.volume),
-    currentAvgVolume: curAvg,
-    previousAvgVolume: prevAvg,
-    avgVolumeDelta: calcDelta(curAvg, prevAvg),
+    weeks, trainingWeeks: training.length, averageVolume, headlineVolume, comparable, averageDelta,
+    workouts: workoutsIn(rangeStart, Infinity), previousWorkouts: workoutsIn(previousStart, rangeStart),
+    muscles, muscleBasis, exercises: exercisesInRange, exercisesCompared,
   }
+}
+
+export function formatAverageBasis({ trainingWeeks, headlineVolume }: Pick<AllExercisesSummary, 'trainingWeeks' | 'headlineVolume'>): string {
+  // The no-break space keeps "weeks" from wrapping alone on narrow phones.
+  if (trainingWeeks) return `avg of ${trainingWeeks} training\u00a0${trainingWeeks === 1 ? 'week' : 'weeks'}`
+  return headlineVolume === null ? 'no full training week' : 'this week so far'
 }
 
 // ── Strength Progression ────────────────────────────────────────────────────
@@ -217,6 +287,34 @@ export function strengthDeltaLabel(firstKg: number, latestKg: number, firstDate:
   if (!delta) return `No change since ${firstDate}`
   return `${delta > 0 ? '+' : '−'}${kgToDisplayWeight(Math.abs(delta), units)} ${units} since ${firstDate}`
 }
+
+export function formatBestSet(best: BestSet, units: WeightUnits): string {
+  if (best.reps === null) return best.weight > 0 ? `${kgToDisplayWeight(best.weight, units)} ${units}` : '—'
+  return best.weight > 0 ? `${kgToDisplayWeight(best.weight, units)} × ${best.reps}` : `${best.reps} ${best.reps === 1 ? 'rep' : 'reps'}`
+}
+
+const signed = (value: number, text: string) => `${value > 0 ? '+' : '−'}${text}`
+
+// Null shows nothing; for assisted rows a minus means less help, so the sign is never coloured.
+export function formatSetChange(change: ExerciseSummaryRow['change'], units: WeightUnits): string {
+  if (!change) return ''
+  if (!change.value) return 'same'
+  const size = Math.abs(change.value)
+  return change.unit === 'kg'
+    ? signed(change.value, `${kgToDisplayWeight(size, units)} ${units}`)
+    : signed(change.value, `${size} ${size === 1 ? 'rep' : 'reps'}`)
+}
+
+export function formatCountChange(value: number): string {
+  return value ? signed(value, String(Math.abs(value))) : 'same'
+}
+
+export function formatPercentChange(percent: number): string {
+  const rounded = Math.round(percent)
+  return rounded ? signed(rounded, `${Math.abs(rounded)}%`) : '0%'
+}
+
+export const previousPeriodLabel = (rangeDays: number) => rangeDays === 365 ? 'previous year' : `previous ${rangeDays} days`
 
 export interface StrengthPoint {
   date: string

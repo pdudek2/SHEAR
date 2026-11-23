@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
+  getFirstWorkoutStartedAt,
   getRecentWorkouts,
   retryPendingMaterializations,
   getProgressSessions,
   getRecords,
 } = vi.hoisted(() => ({
+  getFirstWorkoutStartedAt: vi.fn(),
   getRecentWorkouts: vi.fn(),
   retryPendingMaterializations: vi.fn(),
   getProgressSessions: vi.fn(),
@@ -13,6 +15,7 @@ const {
 }))
 
 vi.mock('../workoutService', () => ({
+  getFirstWorkoutStartedAt,
   getRecentWorkouts,
   retryPendingMaterializations,
 }))
@@ -37,6 +40,7 @@ beforeEach(() => {
   retryPendingMaterializations.mockResolvedValue({ attempted: 0, failed: 0 })
   getProgressSessions.mockResolvedValue(sessions)
   getRecords.mockResolvedValue(records)
+  getFirstWorkoutStartedAt.mockResolvedValue(NOW - 400 * 86_400_000)
 })
 
 describe('loadProgressData', () => {
@@ -48,9 +52,18 @@ describe('loadProgressData', () => {
     expect(result).toMatchObject({
       sessions: { status: 'success', value: sessions },
       records: { status: 'success', value: records },
+      firstWorkoutAt: NOW - 400 * 86_400_000,
       freshness: 'fresh',
       fetchedAt: NOW,
     })
+  })
+
+  it('treats an unreadable first workout as unknown and keeps the periods', async () => {
+    getFirstWorkoutStartedAt.mockRejectedValue(new Error('offline'))
+
+    const result = await loadProgressData()
+
+    expect(result).toMatchObject({ sessions: { status: 'success' }, firstWorkoutAt: null })
   })
 
   it('reports freshness warning when recent-workout lookup fails and still loads projections', async () => {

@@ -1,0 +1,226 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { formatAverageBasis, formatBestSet, formatCountChange, formatPercentChange, formatSetChange, progressExtras, summarizeAllExercises, workoutVolume, type ProgressSessionLite } from '../progress'
+import { getWeekDates } from '../week'
+
+const at = (date: string) => new Date(`${date}T18:00:00`).getTime()
+// Wednesday; with 30 days the full weeks are those starting Oct 26, Nov 2 and Nov 9.
+const anchor = new Date('2026-11-18T12:00:00').getTime()
+
+function session(fields: Partial<ProgressSessionLite> & Pick<ProgressSessionLite, 'workoutId' | 'exerciseId' | 'finishedAt'>): ProgressSessionLite {
+  return {
+    id: `${fields.workoutId}-${fields.exerciseId}`, exerciseSource: 'global', totalVolume: 0, totalSets: 3, bestSetWeight: 0,
+    bestSetReps: 0, exerciseName: fields.exerciseId, muscleGroups: [], category: null, ...fields,
+  }
+}
+
+const sessions = [
+  session({ workoutId: 'w0a', exerciseId: 'assisted-pull-up', finishedAt: at('2026-10-05'), bestSetWeight: 40, bestSetReps: 8, leastAssisted: { weight: 30, reps: 8 }, totalVolume: 900 }),
+  session({ workoutId: 'w0b', exerciseId: 'squat', finishedAt: at('2026-10-12'), bestSetWeight: 100, bestSetReps: 5, totalVolume: 2000, totalSets: 4 }),
+  session({ workoutId: 'w1', exerciseId: 'assisted-pull-up', finishedAt: at('2026-10-27'), bestSetWeight: 40, bestSetReps: 8, leastAssisted: { weight: 25, reps: 8 }, totalVolume: 1000 }),
+  session({ workoutId: 'w1', exerciseId: 'my-thrust', exerciseSource: 'user', finishedAt: at('2026-10-27'), bestSetWeight: 50, bestSetReps: 4, totalVolume: 600, muscleGroups: ['glutes', 'hamstrings'], category: 'legs' }),
+  session({ workoutId: 'w1', exerciseId: 'my-bike', exerciseSource: 'user', finishedAt: at('2026-10-27'), totalSets: 1, muscleGroups: ['quads'], category: 'cardio' }),
+  // The stored muscles are stale; the catalogue says quads, then glutes.
+  session({ workoutId: 'w2', exerciseId: 'squat', finishedAt: at('2026-11-03'), bestSetWeight: 100, bestSetReps: 5, totalVolume: 2000, totalSets: 4, muscleGroups: ['legs'] }),
+  session({ workoutId: 'w3', exerciseId: 'squat', finishedAt: at('2026-11-10'), bestSetWeight: 100, bestSetReps: 6, totalVolume: 2400, totalSets: 4, muscleGroups: ['legs'] }),
+  session({ workoutId: 'w3', exerciseId: 'pull-up', finishedAt: at('2026-11-10'), bestSetReps: 10 }),
+  session({ workoutId: 'w4', exerciseId: 'squat', finishedAt: at('2026-11-17'), bestSetWeight: 105, bestSetReps: 3, totalVolume: 1500, totalSets: 4 }),
+]
+
+describe('summarizeAllExercises', () => {
+  const summary = summarizeAllExercises(sessions, 30, anchor)
+
+  it('averages full weeks without assisted volume and draws the current week apart', () => {
+    expect(summary.weeks.map(({ volume, current }) => [volume, current])).toEqual([[600, false], [2000, false], [2400, false], [1500, true]])
+    expect(summary.trainingWeeks).toBe(3)
+    expect(summary.averageVolume).toBeCloseTo(5000 / 3)
+    // The full weeks before the range since the first workout: Oct 5 (assisted only, 0) and Oct 12 (2000).
+    // Oct 19 straddles the range start, so it belongs to neither period.
+    expect(summary.averageDelta).toBeCloseTo(200 / 3)
+    expect([summary.comparable, summary.workouts, summary.previousWorkouts]).toEqual([true, 4, 2])
+  })
+
+  it('compares the same steady weeks as no change, whatever happens in the week across the range start', () => {
+    const steady = ['2026-09-22', '2026-09-29', '2026-10-06', '2026-10-13', '2026-10-27', '2026-11-03', '2026-11-10']
+      .map((date, index) => session({ workoutId: `s${index}`, exerciseId: 'squat', finishedAt: at(date), totalVolume: 1000 }))
+    expect(summarizeAllExercises(steady, 30, anchor).averageDelta).toBe(0)
+    const spike = session({ workoutId: 'spike', exerciseId: 'squat', finishedAt: at('2026-10-20'), totalVolume: 10_000 })
+    expect(summarizeAllExercises([...steady, spike], 30, anchor).averageDelta).toBe(0)
+  })
+
+  it('still compares workouts when there is no volume to compare', () => {
+    const bodyweight = ['2026-09-22', '2026-09-29', '2026-10-06', '2026-10-13', '2026-10-27', '2026-11-03']
+      .map((date, index) => session({ workoutId: `b${index}`, exerciseId: 'pull-up', finishedAt: at(date), bestSetReps: 8 }))
+    const summary = summarizeAllExercises(bodyweight, 30, anchor)
+    expect([summary.comparable, summary.averageDelta, summary.workouts, summary.previousWorkouts]).toEqual([true, null, 2, 4])
+  })
+
+  it('counts sets per muscle per training week, the first muscle whole and the others half, without cardio', () => {
+    expect(summary.muscleBasis).toBe('average')
+    expect(Object.fromEntries(summary.muscles.map(({ muscle, sets }) => [muscle, Math.round(sets * 1000) / 1000]))).toEqual({
+      quads: 2.667, glutes: 2.333, back: 2, biceps: 1, hamstrings: 0.5,
+    })
+    // One calf set over three training weeks would read 0 beside a bar.
+    const calves = session({ workoutId: 'w3', exerciseId: 'my-calf', exerciseSource: 'user', finishedAt: at('2026-11-10'), totalSets: 1, muscleGroups: ['calves'], category: 'legs' })
+    expect(summarizeAllExercises([...sessions, calves], 30, anchor).muscles.map(({ muscle }) => muscle)).not.toContain('calves')
+  })
+
+  it('shows each exercise best set and its change in kg, or in reps when the weight held', () => {
+    expect(summary.exercisesCompared).toBe(true)
+    const rows = Object.fromEntries(summary.exercises.map((row) => [row.key, [row.sessions, row.best, row.change]]))
+    expect(summary.exercises[0]!.key).toBe('global:squat')
+    expect(rows['global:squat']).toEqual([3, { weight: 105, reps: 3 }, { unit: 'kg', value: 5 }])
+    expect(rows['global:pull-up']).toEqual([1, { weight: 0, reps: 10 }, null])
+    // Less assistance is the better set.
+    expect(rows['global:assisted-pull-up']).toEqual([1, { weight: 25, reps: 8 }, { unit: 'kg', value: -5 }])
+    expect(rows['user:my-thrust']).toEqual([1, { weight: 50, reps: 4 }, null])
+
+    const reps = summarizeAllExercises([...sessions, session({ workoutId: 'w5', exerciseId: 'squat', finishedAt: at('2026-10-10'), bestSetWeight: 105, bestSetReps: 1 })], 30, anchor)
+    expect(reps.exercises.find(({ key }) => key === 'global:squat')!.change).toEqual({ unit: 'reps', value: 2 })
+
+    const shown = (key: string, units: 'kg' | 'lbs') => {
+      const row = summary.exercises.find((entry) => entry.key === key)!
+      return [formatBestSet(row.best, units), formatSetChange(row.change, units)]
+    }
+    expect(shown('global:squat', 'kg')).toEqual(['105 × 3', '+5 kg'])
+    expect(shown('global:squat', 'lbs')).toEqual(['231.5 × 3', '+11 lbs'])
+    expect(shown('global:pull-up', 'kg')).toEqual(['10 reps', ''])
+    expect(shown('global:assisted-pull-up', 'kg')).toEqual(['25 × 8', '−5 kg'])
+    expect([formatSetChange({ unit: 'reps', value: 2 }, 'kg'), formatSetChange({ unit: 'reps', value: -1 }, 'kg'), formatSetChange({ unit: 'kg', value: 0 }, 'kg')]).toEqual(['+2 reps', '−1 rep', 'same'])
+    expect([formatCountChange(2), formatCountChange(-3), formatCountChange(0)]).toEqual(['+2', '−3', 'same'])
+    expect([formatPercentChange(6.4), formatPercentChange(-12.6), formatPercentChange(-0.3)]).toEqual(['+6%', '−13%', '0%'])
+  })
+
+  it('does not invent reps for old documents without them', () => {
+    const old = session({ workoutId: 'old', exerciseId: 'squat', finishedAt: at('2026-10-10'), bestSetWeight: 105, bestSetReps: undefined })
+    const withOld = summarizeAllExercises([...sessions, old], 30, anchor)
+    expect(withOld.exercises.find(({ key }) => key === 'global:squat')!.change).toBeNull()
+    expect(formatBestSet({ weight: 100, reps: null }, 'kg')).toBe('100 kg')
+  })
+
+  it('has no average or change in the first week and counts this week instead', () => {
+    const first = summarizeAllExercises([session({ workoutId: 'n1', exerciseId: 'squat', finishedAt: at('2026-11-17'), bestSetWeight: 60, bestSetReps: 5, totalVolume: 900, totalSets: 2 })], 90, anchor)
+    expect(first.weeks).toEqual([expect.objectContaining({ volume: 900, current: true })])
+    expect([first.averageVolume, first.averageDelta, first.muscleBasis, first.exercisesCompared]).toEqual([null, null, 'thisWeek', false])
+    expect(first.muscles).toEqual([{ muscle: 'quads', sets: 2 }, { muscle: 'glutes', sets: 1 }])
+  })
+
+  it('gives no change with fewer than two full weeks before the range', () => {
+    const late = sessions.filter(({ finishedAt }) => finishedAt >= at('2026-10-20'))
+    expect(summarizeAllExercises(late, 30, anchor).averageDelta).toBeNull()
+  })
+})
+
+describe('averages over the weeks with training', () => {
+  const squat = (date: string, totalVolume = 9000) => session({ workoutId: date, exerciseId: 'squat', finishedAt: at(date), totalVolume, totalSets: 12, category: 'legs' })
+  const run = (date: string) => session({ workoutId: date, exerciseId: 'treadmill', finishedAt: at(date), totalSets: 1, category: 'cardio' })
+  const before = ['05-26', '06-02', '06-09', '06-16', '06-23', '06-30', '07-07', '07-14', '07-21', '07-28', '08-04', '08-11'].map((date) => squat(`2026-${date}`))
+
+  it('does not spread the return from a break over the weeks away', () => {
+    const back = summarizeAllExercises([...before, squat('2026-11-10')], 90, anchor)
+    expect([back.averageVolume, back.headlineVolume, back.trainingWeeks, back.averageDelta]).toEqual([9000, 9000, 1, null])
+    expect(back.weeks).toHaveLength(13)
+    expect(back.muscles[0]).toEqual({ muscle: 'quads', sets: 12 })
+    expect(formatAverageBasis(back)).toBe('avg of 1 training\u00a0week')
+    // The workout count still compares calendar periods.
+    expect([back.comparable, back.workouts, back.previousWorkouts]).toEqual([true, 1, 12])
+
+    const later = summarizeAllExercises([...before, squat('2026-11-03'), squat('2026-11-10')], 90, anchor)
+    expect([later.trainingWeeks, later.averageDelta, formatAverageBasis(later)]).toEqual([2, 0, 'avg of 2 training\u00a0weeks'])
+  })
+
+  it('shows this week on the week of the return', () => {
+    const back = summarizeAllExercises([...before, squat('2026-11-17', 6000)], 90, anchor)
+    expect([back.averageVolume, back.headlineVolume, back.averageDelta, back.comparable, back.muscleBasis]).toEqual([null, 6000, null, true, 'thisWeek'])
+    expect(formatAverageBasis(back)).toBe('this week so far')
+  })
+
+  it('has no headline without a training week to show', () => {
+    for (const only of [squat('2026-10-20'), run('2026-11-17')]) {
+      const none = summarizeAllExercises([only], 30, anchor)
+      expect([none.headlineVolume, formatAverageBasis(none)]).toEqual([null, 'no full training week'])
+    }
+  })
+
+  it('leaves cardio-only weeks out and keeps bodyweight weeks', () => {
+    const lifts = [squat('2026-10-27'), squat('2026-11-10')]
+    expect(summarizeAllExercises([...lifts, run('2026-11-03')], 30, anchor)).toMatchObject({ trainingWeeks: 2, averageVolume: 9000 })
+    const bodyweight = session({ workoutId: 'body', exerciseId: 'pull-up', finishedAt: at('2026-11-03'), category: 'back' })
+    expect(summarizeAllExercises([...lifts, bodyweight], 30, anchor)).toMatchObject({ trainingWeeks: 3, averageVolume: 6000 })
+  })
+
+  it('reads the same from a longer load as from twice the range', () => {
+    const recent = [squat('2026-11-03'), squat('2026-11-10')]
+    expect(summarizeAllExercises([...before, ...recent], 30, anchor)).toEqual(summarizeAllExercises(recent, 30, anchor))
+  })
+})
+
+describe('weeks in a time zone that skips midnight', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('keeps the Sunday of the change in its week on Progress and Home', () => {
+    vi.stubEnv('TZ', 'America/Santiago')
+    // Guards the test itself: in a worker thread Node ignores a TZ change.
+    expect(new Date('2026-09-06T00:00:00').getHours()).toBe(1)
+    const dates = ['2026-08-25', '2026-09-06', '2026-09-08']
+    const squats = dates.map((date, index) => session({ workoutId: `t${index}`, exerciseId: 'squat', finishedAt: at(date), totalVolume: 3000 }))
+    expect(summarizeAllExercises(squats, 30, at('2026-09-16')).weeks.map(({ volume }) => volume)).toEqual([3000, 3000, 3000, 0])
+    expect(getWeekDates(new Date(at('2026-09-06')))[0]).toEqual(new Date('2026-08-31T00:00:00'))
+  })
+})
+
+describe('workoutVolume', () => {
+  it.each([
+    ['global', 'bench-press', 720],
+    ['global', 'assisted-pull-up', 0],
+    ['user', 'assisted-pull-up', 720],
+  ] as const)('counts %s %s as %i kg', (exerciseSource, exerciseId, volume) => {
+    expect(workoutVolume([{ exerciseId, exerciseSource, sets: [{ weight: 30, reps: 8 }, { weight: 60, reps: 8 }] }])).toBe(volume)
+  })
+})
+
+describe('progressExtras', () => {
+  it('falls back on old documents and finds the set with the least assistance', () => {
+    expect(progressExtras({}, 'squat', 'global')).toEqual({ category: 'legs' })
+    expect(progressExtras({}, 'treadmill', 'global')).toEqual({ category: 'cardio' })
+    expect(progressExtras({}, 'treadmill', 'user')).toEqual({ category: null })
+    expect(progressExtras({ bestSetWeight: 100, sets: [{ weight: 90, reps: 10 }, { weight: 100, reps: 6 }, { weight: 100, reps: 8 }] }, 'squat', 'global')).toEqual({ bestSetReps: 8, category: 'legs' })
+    expect(progressExtras({ bestSetReps: 6, category: 'legs', sets: [{ weight: 10, reps: 5 }] }, 'squat', 'global')).toEqual({ bestSetReps: 6, category: 'legs' })
+    const sets = [{ weight: 40, reps: 8 }, { weight: 25, reps: 6 }, { weight: 25, reps: 7 }, { weight: 20, reps: 0 }, { weight: 'x', reps: 9 }]
+    expect(progressExtras({ sets }, 'assisted-pull-up', 'global').leastAssisted).toEqual({ weight: 25, reps: 7 })
+  })
+})
+
+describe('summarizeAllExercises on a young account', () => {
+  // Squat every Monday, Wednesday and Friday from `first`, 6,000 kg each: a full week is 18,000 kg.
+  const steady = (first: string, days: number) => Array.from({ length: days }, (_, day) => new Date(new Date(`${first}T18:00:00`).getTime() + day * 86_400_000))
+    .filter((date) => [1, 3, 5].includes(date.getDay()) && date.getTime() < anchor)
+    .map((date) => session({ workoutId: `y${date.getTime()}`, exerciseId: 'squat', finishedAt: date.getTime(), bestSetWeight: 100, bestSetReps: 8, totalVolume: 6000, totalSets: 4 }))
+
+  it('never counts the week of the first workout as a training week', () => {
+    // First workout on Friday Nov 6: its week has one workout, the full week after it three.
+    const young = steady('2026-11-06', 12)
+    const summary = summarizeAllExercises(young, 30, anchor, young[0]!.finishedAt)
+    expect([summary.averageVolume, summary.trainingWeeks]).toEqual([18000, 1])
+    expect(summary.muscles[0]).toEqual({ muscle: 'quads', sets: 12 })
+    // With only that week behind it, the headline is this week so far rather than a partial week's average.
+    const first = steady('2026-11-13', 5)
+    const only = summarizeAllExercises(first, 30, anchor, first[0]!.finishedAt)
+    expect([only.averageVolume, only.headlineVolume, only.muscleBasis]).toEqual([null, 6000, 'thisWeek'])
+  })
+
+  it('compares best sets and the weekly average without the first week, and workout counts only over a covered period', () => {
+    // 45 days of the same training: one training week before the range once the first is left out.
+    const young = steady('2026-10-05', 44)
+    const summary = summarizeAllExercises(young, 30, anchor, young[0]!.finishedAt)
+    expect([summary.comparable, summary.averageDelta, summary.exercisesCompared]).toEqual([false, null, true])
+    expect(summary.exercises.map(({ change }) => change)).toEqual([{ unit: 'reps', value: 0 }])
+    // About 8 weeks: three training weeks before the range, so the average compares, the workout count still does not.
+    const older = steady('2026-09-25', 60)
+    const eight = summarizeAllExercises(older, 30, anchor, older[0]!.finishedAt)
+    expect([eight.comparable, eight.averageDelta]).toEqual([false, 0])
+    // Training from before the period before compares workout counts as usual.
+    expect(summarizeAllExercises(young, 30, anchor, at('2026-09-01')).comparable).toBe(true)
+  })
+})

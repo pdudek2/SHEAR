@@ -7,7 +7,7 @@ const { auth } = vi.hoisted(() => ({
 vi.mock('../firebase', () => ({ auth, db: {} }))
 vi.mock('../aiKeyStorage', () => ({ getOpenRouterModel: () => 'claude-test' }))
 
-import { AiApiError, generateTrainingPlan, streamChatReply } from '../chatService'
+import { AiApiError, fetchCoachQuota, generateTrainingPlan, streamChatReply } from '../chatService'
 
 const encoder = new TextEncoder()
 
@@ -261,5 +261,21 @@ describe('bounded chat context and connection errors', () => {
     await expect(generateTrainingPlan({ apiKey: options().apiKey, request: {
       goal: 'Strength', daysPerWeek: 3, experience: 'intermediate', equipment: [], focus: '', notes: '',
     } })).rejects.toThrow(expected)
+  })
+})
+
+describe('fetchCoachQuota', () => {
+  it('shares one request between reads made at the same time and asks again afterwards', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(
+      JSON.stringify({ used: 1, limit: 20, resetAt: '2026-11-24T00:00:00.000Z', shared: false }), { status: 200 },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const [first, second] = await Promise.all([fetchCoachQuota(), fetchCoachQuota()])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(second).toEqual(first)
+
+    await fetchCoachQuota()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
