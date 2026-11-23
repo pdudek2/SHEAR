@@ -322,6 +322,13 @@ export default function WorkoutPage() {
       if ('vibrate' in navigator) navigator.vibrate(12)
     } else {
       useWorkoutStore.getState().clearRestTimer()
+      // The set taken back is the one to redo, also when a pair has moved on to the next round.
+      const exercise = currentActive?.exercises[exerciseIndex]
+      if (exercise && currentSet) {
+        const clientId = getExerciseClientId(exercise, exerciseIndex)
+        setManualExerciseClientId(clientId)
+        setSelectedSet({ exerciseId: clientId, setId: currentSet.clientId ?? String(setIndex) })
+      }
     }
   }, [histories, units, userExercises])
 

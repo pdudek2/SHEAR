@@ -39,7 +39,7 @@ async function openPair(page: Page, request: APIRequestContext, hipWeight: strin
   await page.getByRole('button', { name: 'Return to workout' }).click()
   // B's suggestion comes from the same history as the slip check, so it shows the check is ready; then back to 1A.
   await page.getByRole('button', { name: /^1B, Hip Abduction/ }).click()
-  await expect(page.getByText(/B · Hip Abduction: Suggested/)).toBeVisible()
+  await expect(page.getByText(/^Suggested/)).toBeVisible()
   await page.getByRole('button', { name: /^1A, Leg Curl/ }).click()
   await expect(page.locator('.workout-set-panel input[role="spinbutton"]').first()).toHaveValue('40')
   return app
@@ -67,7 +67,7 @@ test.describe('Superset in a session', () => {
     }
   })
 
-  test('Enter weight for the other member without weight puts the typed weight into that member', async ({ page, request }) => {
+  test('Enter weight for the other member without weight puts the typed weight into that member, and taking it back reopens it', async ({ page, request }) => {
     test.skip(process.env.E2E_BACKEND !== 'emulator', 'Needs a fresh emulator account')
     const app = await openPair(page, request, '')
     try {
@@ -77,6 +77,15 @@ test.describe('Superset in a session', () => {
       await page.keyboard.type('35')
       await expect(page.getByRole('button', { name: /^1B, Hip Abduction: last 30 × 12, today 35 × 12/ })).toBeVisible()
       await expect(page.getByRole('button', { name: /^1A, Leg Curl: .*today 40 × 10/ })).toBeVisible()
+
+      // Log 1B and 1A, then take 1B back: the panel returns to it instead of staying on round 2.
+      const logSet = page.getByRole('region', { name: 'Current set' }).getByRole('button', { name: /^Log set/ })
+      await logSet.click()
+      await expect(page.getByRole('button', { name: /^1A, Leg Curl/ })).toHaveAttribute('aria-pressed', 'true')
+      await logSet.click()
+      await expect(page.getByRole('button', { name: /^2A, Leg Curl/ })).toHaveAttribute('aria-pressed', 'true')
+      await page.getByRole('button', { name: 'Unmark set 1B for Hip Abduction' }).click()
+      await expect(page.getByRole('button', { name: /^1B, Hip Abduction/ })).toHaveAttribute('aria-pressed', 'true')
     } finally {
       await deleteApp(app)
     }

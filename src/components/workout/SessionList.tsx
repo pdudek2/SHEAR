@@ -170,7 +170,7 @@ export function GroupBlock({ session, indices, currentIndex, panelSet, units, us
         )
       })}
       {hint && hinted && hinted.sets.some((set) => !set.done) && (
-        <OverloadHint hint={{ ...hint.suggestion, label: `${letter(currentIndex)} · ${hinted.name}: ${hint.suggestion.label}` }} onApply={hint.onApply} onDismiss={hint.onDismiss} />
+        <OverloadHint hint={hint.suggestion} onApply={hint.onApply} onDismiss={hint.onDismiss} />
       )}
       <div className="workout-set-header" aria-hidden="true">
         <span>Set</span>

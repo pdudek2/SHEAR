@@ -87,7 +87,7 @@ describe('session list', () => {
       hint={{ suggestion: { label: '45 kg, aim for 10 reps', weight: 45, reps: 10 }, onApply, onDismiss: vi.fn() }}
       onSelect={vi.fn()} onToggle={vi.fn()} onRemove={vi.fn()} onRemoveSet={vi.fn()} onAddRound={vi.fn()} />)
 
-    expect(screen.getByText('B · Hip Abduction: 45 kg, aim for 10 reps')).toBeInTheDocument()
+    expect(screen.getByText('45 kg, aim for 10 reps')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
     expect(onApply).toHaveBeenCalledOnce()
   })
