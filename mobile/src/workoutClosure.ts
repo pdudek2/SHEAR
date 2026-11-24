@@ -346,8 +346,9 @@ export class WorkoutClosureController {
         this.publish({ status: 'corrupt' })
       } else if (result.status === 'intent') {
         this.publish({ status: 'closure_unconfirmed', intent: result.intent, locked: true })
-        // Sent again once on its own; the server answers a repeated finish or discard with the same outcome.
-        return this.retry()
+        // A finish (always stored with its revision) is sent again once on its own: the server refuses it if the
+        // session changed meanwhile and answers a repeat with the same workout. Discards stay manual.
+        if (result.intent.action === 'finish') return this.retry()
       } else {
         this.publish({ status: 'ready' })
       }

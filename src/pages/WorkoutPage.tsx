@@ -212,16 +212,21 @@ export default function WorkoutPage() {
     startNewSession,
     staleSession,
   } = useActiveSession(user?.uid ?? null)
-  // A closure left pending by a reload is sent again once on its own; both endpoints answer a repeat with the same outcome.
-  const [recoveredClosure] = useState(() => (user ? readWorkoutClosureIntent(user.uid) : null))
+  // A finish left pending by a reload is sent again once on its own, but only with its revision: the server then
+  // refuses it if the session changed meanwhile and answers a repeat with the same workout. Discards stay manual.
+  const [recoveredFinish] = useState(() => {
+    const stored = user ? readWorkoutClosureIntent(user.uid) : null
+    return stored?.action === 'finish' && stored.sessionRevision ? stored : null
+  })
   const recoveryTriedRef = useRef(false)
-  const retryRecoveredClosure = useEffectEvent(() => { void retryClosure() })
+  const retryRecoveredFinish = useEffectEvent(() => { void retryClosure() })
   useEffect(() => {
-    if (!ready || recoveryTriedRef.current || !recoveredClosure || closureState !== 'closure_unconfirmed') return
-    if (closureIntent?.action !== recoveredClosure.action || closureIntent.session.sessionId !== recoveredClosure.session.sessionId) return
+    if (!ready || recoveryTriedRef.current || !recoveredFinish || closureState !== 'closure_unconfirmed') return
+    if (closureIntent?.action !== 'finish' || closureIntent.session.sessionId !== recoveredFinish.session.sessionId
+      || closureIntent.sessionRevision !== recoveredFinish.sessionRevision) return
     recoveryTriedRef.current = true
-    retryRecoveredClosure()
-  }, [closureIntent, closureState, ready, recoveredClosure])
+    retryRecoveredFinish()
+  }, [closureIntent, closureState, ready, recoveredFinish])
   const [showPicker, setShowPicker] = useState(false)
   const [closureRejection, setClosureRejection] = useState<string | null>(null)
   const addExerciseRef = useRef<HTMLButtonElement>(null)
