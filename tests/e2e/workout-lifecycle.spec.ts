@@ -340,7 +340,7 @@ test.describe('Workout lifecycle Phase 1 regressions', () => {
     expect(await readLifecycleActiveSession()).toBeNull()
   })
 
-  test('lost finalize acknowledgement keeps recovery intent and retry creates exactly one workout', async ({
+  test('lost finalize acknowledgement keeps recovery intent and a reload finishes it with exactly one workout', async ({
     browserDiagnostics,
     context,
     cleanup,
@@ -383,8 +383,6 @@ test.describe('Workout lifecycle Phase 1 regressions', () => {
     expect(await readLifecycleWorkouts(sessionId)).toHaveLength(1)
     expect(await readLifecycleActiveSession()).toBeNull()
     await page.reload()
-    await expect(page.getByRole('alert')).toContainText('Could not confirm session closure.')
-    await page.getByRole('button', { name: 'Try again' }).click()
     await page.waitForURL(`/workout/${sessionId}`, { timeout: RESPONSE_TIMEOUT_MS })
     await expect(page.getByRole('heading', { name: 'Workout saved' })).toBeVisible()
     expect(await readLifecycleWorkouts(sessionId)).toHaveLength(1)
