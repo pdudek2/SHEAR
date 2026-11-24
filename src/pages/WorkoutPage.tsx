@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -12,7 +12,7 @@ import { getRecentWorkouts } from '../lib/workoutService'
 import { recentExercisePicks, type RecentExercisePick } from '../shared/recentExercises'
 import { discardWorkoutLifecycle, finishWorkoutLifecycle } from '../lib/workoutLifecycle'
 import { finalizeWorkout, WorkoutClosureError } from '../lib/workoutClosureService'
-import type { WorkoutClosureIntent } from '../lib/workoutClosureIntent'
+import { readWorkoutClosureIntent, type WorkoutClosureIntent } from '../lib/workoutClosureIntent'
 import { getExerciseSessions } from '../lib/exerciseDetailService'
 import { useActiveSession } from '../hooks/useActiveSession'
 import { useUserExercises } from '../hooks/useUserExercises'
@@ -212,6 +212,16 @@ export default function WorkoutPage() {
     startNewSession,
     staleSession,
   } = useActiveSession(user?.uid ?? null)
+  // A closure left pending by a reload is sent again once on its own; both endpoints answer a repeat with the same outcome.
+  const [recoveredClosure] = useState(() => (user ? readWorkoutClosureIntent(user.uid) : null))
+  const recoveryTriedRef = useRef(false)
+  const retryRecoveredClosure = useEffectEvent(() => { void retryClosure() })
+  useEffect(() => {
+    if (!ready || recoveryTriedRef.current || !recoveredClosure || closureState !== 'closure_unconfirmed') return
+    if (closureIntent?.action !== recoveredClosure.action || closureIntent.session.sessionId !== recoveredClosure.session.sessionId) return
+    recoveryTriedRef.current = true
+    retryRecoveredClosure()
+  }, [closureIntent, closureState, ready, recoveredClosure])
   const [showPicker, setShowPicker] = useState(false)
   const [closureRejection, setClosureRejection] = useState<string | null>(null)
   const addExerciseRef = useRef<HTMLButtonElement>(null)
