@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ActiveWorkout } from '../../store/workoutStore'
-import type { WorkoutClosureIntent } from '../../lib/workoutClosureIntent'
+import { clearWorkoutClosureIntent, writeWorkoutClosureIntent, type WorkoutClosureIntent } from '../../lib/workoutClosureIntent'
 import WorkoutPage from '../WorkoutPage'
 import { WorkoutClosureError } from '../../lib/workoutClosureService'
 
@@ -502,6 +502,7 @@ describe('WorkoutPage stale-session feedback', () => {
       status: 'materialized',
     })
     renderStaleSessionPage()
+    expect(mocks.finalizeWorkout).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
 
@@ -510,6 +511,72 @@ describe('WorkoutPage stale-session feedback', () => {
       'revision-recovery',
     ))
     expect(mocks.prepareFinishClosure).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a discard', 'discard'],
+    ['a finish without its revision', 'finish'],
+  ] as const)('leaves %s pending from a reload to the user', async (_, action) => {
+    const session: ActiveWorkout = {
+      sessionId: 'session-waiting',
+      startedAt: Date.now(),
+      templateId: null,
+      label: 'Push',
+      exercises: [],
+    }
+    const storedIntent: WorkoutClosureIntent = { action, session, createdAt: 1_797_000_000_000 }
+    writeWorkoutClosureIntent('user-1', storedIntent)
+    mocks.active = session
+    mocks.closureIntent = storedIntent
+    mocks.closureState = 'closure_unconfirmed'
+    mocks.staleSession = null
+    mocks.beginClosure.mockReturnValue(storedIntent)
+    try {
+      renderStaleSessionPage()
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeVisible()
+      expect(mocks.beginClosure).not.toHaveBeenCalled()
+      expect(mocks.finalizeWorkout).not.toHaveBeenCalled()
+      expect(mocks.discardWorkoutLifecycle).not.toHaveBeenCalled()
+    } finally {
+      clearWorkoutClosureIntent('user-1')
+    }
+  })
+
+  it('sends a finish left pending by a reload once on its own', async () => {
+    const session: ActiveWorkout = {
+      sessionId: 'session-reloaded',
+      startedAt: Date.now(),
+      templateId: null,
+      label: 'Push',
+      exercises: [{
+        exerciseId: 'bench-press',
+        exerciseSource: 'global',
+        name: 'Bench Press',
+        sets: [{ weight: '80', reps: '5', done: true }],
+      }],
+    }
+    const storedIntent: WorkoutClosureIntent = {
+      action: 'finish',
+      session,
+      createdAt: 1_797_000_000_000,
+      sessionRevision: 'revision-reloaded',
+    }
+    writeWorkoutClosureIntent('user-1', storedIntent)
+    mocks.active = session
+    mocks.closureIntent = storedIntent
+    mocks.closureState = 'closure_unconfirmed'
+    mocks.staleSession = null
+    mocks.beginClosure.mockReturnValue(storedIntent)
+    mocks.finalizeWorkout.mockRejectedValue(new WorkoutClosureError('ambiguous', 'Could not confirm session closure.'))
+    try {
+      const { rerender } = renderStaleSessionPage()
+      await waitFor(() => expect(mocks.finalizeWorkout).toHaveBeenCalledWith('session-reloaded', 'revision-reloaded'))
+      rerender(createElement(MemoryRouter, null, createElement(WorkoutPage)))
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeVisible()
+      expect(mocks.finalizeWorkout).toHaveBeenCalledOnce()
+    } finally {
+      clearWorkoutClosureIntent('user-1')
+    }
   })
 
   it.each(['materialized', 'projection_pending'] as const)(

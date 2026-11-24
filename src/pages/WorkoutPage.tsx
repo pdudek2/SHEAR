@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -12,7 +12,7 @@ import { getRecentWorkouts } from '../lib/workoutService'
 import { recentExercisePicks, type RecentExercisePick } from '../shared/recentExercises'
 import { discardWorkoutLifecycle, finishWorkoutLifecycle } from '../lib/workoutLifecycle'
 import { finalizeWorkout, WorkoutClosureError } from '../lib/workoutClosureService'
-import type { WorkoutClosureIntent } from '../lib/workoutClosureIntent'
+import { readWorkoutClosureIntent, type WorkoutClosureIntent } from '../lib/workoutClosureIntent'
 import { getExerciseSessions } from '../lib/exerciseDetailService'
 import { useActiveSession } from '../hooks/useActiveSession'
 import { useUserExercises } from '../hooks/useUserExercises'
@@ -212,6 +212,21 @@ export default function WorkoutPage() {
     startNewSession,
     staleSession,
   } = useActiveSession(user?.uid ?? null)
+  // A finish left pending by a reload is sent again once on its own, but only with its revision: the server then
+  // refuses it if the session changed meanwhile and answers a repeat with the same workout. Discards stay manual.
+  const [recoveredFinish] = useState(() => {
+    const stored = user ? readWorkoutClosureIntent(user.uid) : null
+    return stored?.action === 'finish' && stored.sessionRevision ? stored : null
+  })
+  const recoveryTriedRef = useRef(false)
+  const retryRecoveredFinish = useEffectEvent(() => { void retryClosure() })
+  useEffect(() => {
+    if (!ready || recoveryTriedRef.current || !recoveredFinish || closureState !== 'closure_unconfirmed') return
+    if (closureIntent?.action !== 'finish' || closureIntent.session.sessionId !== recoveredFinish.session.sessionId
+      || closureIntent.sessionRevision !== recoveredFinish.sessionRevision) return
+    recoveryTriedRef.current = true
+    retryRecoveredFinish()
+  }, [closureIntent, closureState, ready, recoveredFinish])
   const [showPicker, setShowPicker] = useState(false)
   const [closureRejection, setClosureRejection] = useState<string | null>(null)
   const addExerciseRef = useRef<HTMLButtonElement>(null)

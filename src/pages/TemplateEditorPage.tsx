@@ -489,6 +489,7 @@ export default function TemplateEditorPage() {
                 id="template-name"
                 aria-describedby={needsName ? 'template-name-hint' : undefined}
                 type="text"
+                maxLength={120}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="E.g. Upper / Lower 4 days"
@@ -578,6 +579,7 @@ export default function TemplateEditorPage() {
                     <input
                       id={`template-day-name-${selectedDay._id}`}
                       type="text"
+                      maxLength={80}
                       value={selectedDay.name}
                       onChange={(event) => updateDay(selectedDayIndex, {
                         ...selectedDay,

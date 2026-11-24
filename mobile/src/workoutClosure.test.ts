@@ -402,3 +402,44 @@ test('finish completed after Minimize is consumed without navigating now or on r
   assert.equal(h.controller.consumeFinishedNavigation(true), null)
   assert.deepEqual(h.states.at(-1)!.completed, { action: 'finish', workoutId: 'session-a', status: 'materialized' })
 })
+
+test('a finish left pending by a restart is sent once on start and releases the workout when the server confirms it', async () => {
+  const slots = new MemorySlots()
+  const seeding = new ClosureIntentJournal(slots)
+  await seeding.load('user-a')
+  await seeding.writeIntent('user-a', finish)
+  const h = harness('user-a', slots)
+  const starting = h.controller.start()
+  await wait()
+  assert.deepEqual(h.calls, [finish])
+  h.requests[0]!.resolve({ action: 'finish', workoutId: 'session-a', status: 'materialized' })
+  await starting
+  assert.equal(lastState(h.states).status, 'ready')
+  assert.equal((await new ClosureIntentJournal(slots).load('user-a')).status, 'empty')
+})
+
+test('a pending finish that still cannot be confirmed on start stays locked without a second request', async () => {
+  const slots = new MemorySlots()
+  const seeding = new ClosureIntentJournal(slots)
+  await seeding.load('user-a')
+  await seeding.writeIntent('user-a', finish)
+  const h = harness('user-a', slots)
+  const starting = h.controller.start()
+  await wait()
+  h.requests[0]!.reject(new Error('offline'))
+  await starting
+  assert.equal(lastState(h.states).status, 'closure_unconfirmed')
+  assert.equal(h.controller.canEdit(), false)
+  assert.deepEqual(h.calls, [finish])
+})
+
+test('a pending discard waits for the user on start', async () => {
+  const slots = new MemorySlots()
+  const seeding = new ClosureIntentJournal(slots)
+  await seeding.load('user-a')
+  await seeding.writeIntent('user-a', discard)
+  const h = harness('user-a', slots)
+  await h.controller.start()
+  assert.deepEqual(lastState(h.states), { status: 'closure_unconfirmed', intent: discard, locked: true })
+  assert.equal(h.calls.length, 0)
+})
