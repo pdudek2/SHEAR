@@ -14,6 +14,7 @@ import { ActionFeedback } from '../components/ActionFeedback'
 import { LoadingState } from '../components/ui'
 import AppLayout from '../components/AppLayout'
 import { routeTitle } from '../lib/routeTitle'
+import { RouteError } from './RouteError'
 import {
   loadChatPage,
   loadDashboardPage,
@@ -156,7 +157,7 @@ function RootRoute() {
 }
 
 const router = createBrowserRouter(createRoutesFromElements(
-  <Route element={<RootRoute />}>
+  <Route element={<RootRoute />} errorElement={<RouteError framed />}>
     <Route path="/privacy" element={<PrivacyPage />} />
     <Route element={<PublicRouteOutlet />}>
       <Route path="/" element={<LandingPage />} />
@@ -168,20 +169,22 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route element={<ProfileRouteOutlet />}>
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/history/import" element={<HistoryImportPage />} />
-          <Route path="/progress" element={<ProgressPage />} />
-          <Route path="/templates" element={<TemplatesPage />} />
-          <Route path="/templates/new" element={<TemplateEditorPage />} />
-          <Route path="/templates/:id/edit" element={<TemplateEditorPage />} />
-          <Route path="/exercises" element={<ExercisesPage />} />
-          <Route path="/exercises/:source/:id" element={<ExerciseDetailPage />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/workout/new" element={<WorkoutPage />} />
-          <Route path="/workout/:id" element={<WorkoutDetailPage />} />
-          <Route path="*" element={<NotFoundPage />} />
+          <Route errorElement={<RouteError />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/history/import" element={<HistoryImportPage />} />
+            <Route path="/progress" element={<ProgressPage />} />
+            <Route path="/templates" element={<TemplatesPage />} />
+            <Route path="/templates/new" element={<TemplateEditorPage />} />
+            <Route path="/templates/:id/edit" element={<TemplateEditorPage />} />
+            <Route path="/exercises" element={<ExercisesPage />} />
+            <Route path="/exercises/:source/:id" element={<ExerciseDetailPage />} />
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/workout/new" element={<WorkoutPage />} />
+            <Route path="/workout/:id" element={<WorkoutDetailPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
         </Route>
       </Route>
     </Route>
