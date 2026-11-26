@@ -38,7 +38,7 @@ export default function PastePlanSheet({ onClose, returnTo }: { onClose: () => v
   return (
     <BottomSheet title="Paste a plan" onClose={onClose} initialFocusRef={fieldRef}>
       <p id={helpId} className="paste-plan-help">
-        Day names on their own line, then one exercise per line. Sets, reps and weight are optional. You check the result before saving.
+        Day names on their own line, then one exercise per line with sets, reps and weight. Leave the numbers out of every line and each exercise starts at 4×8. You check the result before saving.
       </p>
       <textarea
         ref={fieldRef}

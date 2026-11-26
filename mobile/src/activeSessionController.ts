@@ -8,7 +8,8 @@ import {
   setLabel,
   setSetDone,
   updateSetValue,
-  weightFollowers,
+  applyWeightCorrection,
+  startWeightCorrection,
   applyOverload,
   prefillFirstSet,
   type SetField,
@@ -19,6 +20,7 @@ import {
   type TwoSlotSessionJournal,
 } from './sessionJournal'
 import { createLocalId, parseSessionDocument, type ActiveWorkout, type ExerciseSource, type Units } from './session'
+import type { WeightCorrection } from '../../src/shared/nextSessionRecommendation'
 import { refreshStaleActiveSession } from '../../src/shared/sessionDuration'
 import type { CutChoice } from '../../src/shared/sessionCut'
 import type { ExerciseMeta } from '../../src/shared/nextSessionRecommendation'
@@ -118,7 +120,7 @@ export class ActiveSessionController {
   private draft: SessionDraft | null = null
   private conflict: SessionConflictKind | null = null
   // The logged set whose weight is being corrected and the open sets that follow it, chosen when the correction started.
-  private weightCorrection: { setId: string; followers: string[] } | null = null
+  private weightCorrection: WeightCorrection | null = null
   private failed = false
   // Transient save retries ran out; the next server snapshot (the connection is back) starts one more bounded cycle.
   private retryOnReconnect = false
@@ -290,17 +292,21 @@ export class ActiveSessionController {
   }
 
   updateSet(exerciseId: string, setId: string, field: SetField, value: string): void {
-    this.mutate((session) => updateSetValue(session, exerciseId, setId, field, value, this.followers(session, exerciseId, setId, field)))
+    this.mutate((session) => this.corrected(session, updateSetValue(session, exerciseId, setId, field, value), exerciseId, setId, field))
   }
 
   adjustSet(exerciseId: string, setId: string, field: SetField, delta: number): void {
-    this.mutate((session) => adjustSetValue(session, exerciseId, setId, field, delta, this.followers(session, exerciseId, setId, field)))
+    this.mutate((session) => this.corrected(session, adjustSetValue(session, exerciseId, setId, field, delta), exerciseId, setId, field))
   }
 
-  private followers(session: ActiveWorkout, exerciseId: string, setId: string, field: SetField): string[] {
-    if (field !== 'weight') return []
-    if (this.weightCorrection?.setId !== setId) this.weightCorrection = { setId, followers: weightFollowers(session, exerciseId, setId) }
-    return this.weightCorrection.followers
+  // Runs inside the queued update, so the correction follows the order the edits are applied in.
+  private corrected(before: ActiveWorkout, after: ActiveWorkout, exerciseId: string, setId: string, field: SetField): ActiveWorkout {
+    if (field !== 'weight') return after
+    const correction = this.weightCorrection?.setId === setId ? this.weightCorrection : startWeightCorrection(before, exerciseId, setId)
+    if (!correction) return after
+    const applied = applyWeightCorrection(after, exerciseId, setId, correction)
+    this.weightCorrection = applied.correction
+    return applied.session
   }
 
   applyOverload(exerciseId: string, values: { weight?: number; reps?: number }): void {
@@ -312,8 +318,10 @@ export class ActiveSessionController {
   }
 
   setDone(exerciseId: string, setId: string, done: boolean): void {
-    this.weightCorrection = null
-    this.mutate((session) => setSetDone(session, exerciseId, setId, done))
+    this.mutate((session) => {
+      this.weightCorrection = null
+      return setSetDone(session, exerciseId, setId, done)
+    })
   }
 
   addSet(exerciseId: string): void {

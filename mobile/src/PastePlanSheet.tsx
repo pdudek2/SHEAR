@@ -42,7 +42,7 @@ export function PastePlanSheet({ uid, onClose, returnTo }: { uid: string; onClos
   }
 
   return <BottomSheet title="Paste a plan" onClose={onClose}>{(close) => <View>
-    <Text style={styles.help}>Day names on their own line, then one exercise per line. Sets, reps and weight are optional. You check the result before saving.</Text>
+    <Text style={styles.help}>Day names on their own line, then one exercise per line with sets, reps and weight. Leave the numbers out of every line and each exercise starts at 4×8. You check the result before saving.</Text>
     <TextInput accessibilityLabel="Plan text" multiline value={text} maxLength={20000} onChangeText={(value) => { setText(value); setError(null); setEmpty(false) }}
       placeholder={EXAMPLE} placeholderTextColor={colors.mutedSoft} {...fieldColors} textAlignVertical="top" style={styles.field} />
     {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}

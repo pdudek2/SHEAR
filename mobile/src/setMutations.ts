@@ -1,7 +1,7 @@
 import type { ActiveWorkout, WorkoutExercise, WorkoutSet } from './session'
 import { createLocalId } from './session'
 import { clampSetValue, completedSetError, isValidCompletedSet, MAX_DONE_SETS_PER_EXERCISE, MAX_SESSION_EXERCISES } from '../../src/shared/workoutLimits'
-import { applyOverload as applyOverloadToSets, carryLoggedWeight, correctionFollowers, moveFollowers } from '../../src/shared/nextSessionRecommendation'
+import { applyCorrection, applyOverload as applyOverloadToSets, carryLoggedWeight, startCorrection, type WeightCorrection } from '../../src/shared/nextSessionRecommendation'
 
 export { MAX_SESSION_EXERCISES }
 
@@ -21,22 +21,23 @@ function updateTarget(
   }
 }
 
-// The open sets a weight correction of this logged set moves; the caller keeps them while the same set is edited.
-export function weightFollowers(session: ActiveWorkout, exerciseId: string, setId: string): string[] {
+// A weight correction of a logged set, started on the session before the edit; the caller keeps it while that set is edited.
+export function startWeightCorrection(session: ActiveWorkout, exerciseId: string, setId: string): WeightCorrection | null {
   const exercise = session.exercises.find((candidate) => candidate.clientId === exerciseId)
   const index = exercise?.sets.findIndex((set) => set.clientId === setId) ?? -1
-  return exercise && index >= 0 ? correctionFollowers(exercise.sets, index) : []
+  return exercise && index >= 0 ? startCorrection(exercise.sets, index) : null
 }
 
-function withFollowers(session: ActiveWorkout, exerciseId: string, setId: string, followers: readonly string[]): ActiveWorkout {
-  if (!followers.length) return session
-  return {
-    ...session,
-    exercises: session.exercises.map((exercise) => {
-      const index = exercise.clientId === exerciseId ? exercise.sets.findIndex((set) => set.clientId === setId) : -1
-      return index < 0 ? exercise : { ...exercise, sets: moveFollowers(exercise.sets, index, followers) }
-    }),
-  }
+export function applyWeightCorrection(session: ActiveWorkout, exerciseId: string, setId: string, correction: WeightCorrection): { session: ActiveWorkout; correction: WeightCorrection } {
+  let next = correction
+  const exercises = session.exercises.map((exercise) => {
+    const index = exercise.clientId === exerciseId ? exercise.sets.findIndex((set) => set.clientId === setId) : -1
+    if (index < 0) return exercise
+    const applied = applyCorrection(exercise.sets, index, correction)
+    next = applied.correction
+    return applied.sets === exercise.sets ? exercise : { ...exercise, sets: applied.sets }
+  })
+  return { session: { ...session, exercises }, correction: next }
 }
 
 export function updateSetValue(
@@ -45,13 +46,11 @@ export function updateSetValue(
   setId: string,
   field: SetField,
   value: string,
-  followers: readonly string[] = [],
 ): ActiveWorkout {
-  const next = updateTarget(session, exerciseId, setId, (set) => {
+  return updateTarget(session, exerciseId, setId, (set) => {
     const edited = { ...set, [field]: value }
     return settleDone(edited, edited.done && isValidCompletedSet(edited))
   })
-  return field === 'weight' ? withFollowers(next, exerciseId, setId, followers) : next
 }
 
 export function applyOverload(session: ActiveWorkout, exerciseId: string, values: { weight?: number; reps?: number }): ActiveWorkout {
@@ -87,13 +86,11 @@ export function adjustSetValue(
   setId: string,
   field: SetField,
   delta: number,
-  followers: readonly string[] = [],
 ): ActiveWorkout {
-  const next = updateTarget(session, exerciseId, setId, (set) => {
+  return updateTarget(session, exerciseId, setId, (set) => {
     const adjusted = { ...set, [field]: adjustedValue(set[field], field, delta) }
     return settleDone(adjusted, adjusted.done && isValidCompletedSet(adjusted))
   })
-  return field === 'weight' ? withFollowers(next, exerciseId, setId, followers) : next
 }
 
 export function setDoneError(session: ActiveWorkout, exerciseId: string, setId: string): string | null {

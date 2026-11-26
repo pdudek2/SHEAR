@@ -63,26 +63,40 @@ export function carryLoggedWeight<T extends { weight: string; done: boolean }>(s
   })
 }
 
+type CorrectedSet = { clientId?: string; weight: string; done: boolean }
 // Correcting the weight of a logged set corrects the open sets the slip had carried to: those after it, before the next
-// logged set, at its weight when the correction starts. They are chosen once, so a value passed on the way does not join.
-export function correctionFollowers(sets: { clientId?: string; weight: string; done: boolean }[], index: number): string[] {
-  const logged = sets[index]
-  const weight = Number.parseFloat(logged?.weight ?? '')
-  if (!logged?.done || !(weight > 0)) return []
-  const followers: string[] = []
-  for (const set of sets.slice(index + 1)) {
-    if (set.done) break
-    if (set.clientId && Math.abs(Number.parseFloat(set.weight) - weight) < 1e-6) followers.push(set.clientId)
-  }
-  return followers
+// logged set, at its weight when the correction starts. They are chosen once, so a value passed on the way does not join,
+// and the weight last written to them is kept, so a set that something else changed since then leaves the correction.
+export interface WeightCorrection { setId: string; followers: string[]; weight: string }
+
+const sameWeight = (a: string, b: string) => {
+  const [x, y] = [Number.parseFloat(a), Number.parseFloat(b)]
+  return Number.isFinite(x) && Number.isFinite(y) ? Math.abs(x - y) < 1e-6 : a.trim() === b.trim()
 }
 
-// The followers take the logged set's weight while it is a valid one; a half-typed or cleared value moves nothing.
-export function moveFollowers<T extends { clientId?: string; weight: string; done: boolean }>(sets: T[], index: number, followers: readonly string[]): T[] {
+export function startCorrection(sets: CorrectedSet[], index: number): WeightCorrection {
   const logged = sets[index]
-  const weight = Number.parseFloat(logged?.weight ?? '')
-  if (!followers.length || !logged?.done || !(weight > 0)) return sets
-  return sets.map((set) => (set.clientId && followers.includes(set.clientId) && !set.done ? { ...set, weight: String(weight) } : set))
+  const followers: string[] = []
+  if (logged?.done && Number.parseFloat(logged.weight) > 0) {
+    for (const set of sets.slice(index + 1)) {
+      if (set.done) break
+      if (set.clientId && sameWeight(set.weight, logged.weight)) followers.push(set.clientId)
+    }
+  }
+  return { setId: logged?.clientId ?? '', followers, weight: logged?.weight ?? '' }
+}
+
+// The followers take the logged set's new weight; a cleared weight or 0 (a bodyweight set) reaches them too.
+export function applyCorrection<T extends CorrectedSet>(sets: T[], index: number, correction: WeightCorrection): { sets: T[]; correction: WeightCorrection } {
+  const logged = sets[index]
+  if (!logged?.done || !correction.followers.length) return { sets, correction }
+  const parsed = Number.parseFloat(logged.weight)
+  const weight = parsed > 0 ? String(parsed) : logged.weight
+  const followers = correction.followers.filter((id) => sets.some((set) => set.clientId === id && !set.done && sameWeight(set.weight, correction.weight)))
+  return {
+    sets: sets.map((set) => (set.clientId && followers.includes(set.clientId) ? { ...set, weight } : set)),
+    correction: { ...correction, followers, weight },
+  }
 }
 
 export interface NextSessionExercise {

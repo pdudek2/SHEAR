@@ -51,7 +51,7 @@ import {
   storedValueToSetInput,
 } from '../src/setInput'
 import { getAuthErrorMessage } from '../../src/shared/authErrors'
-import { bestSet, EQUIPMENT_LABELS, removeSetMessage, exerciseTargetLabel, focusExerciseIndex, formatPreviousSet, nextGroupMember, panelSetIndex, reconcileRest, restAfterSet, resumedRest, roundRows, sessionBlocks, setPairLabel, type RestCheck, setPanelRestLabel, setPanelStatus, upNextQueue, WORKOUT_LABELS } from '../../src/shared/workoutDisplay'
+import { bestSet, EQUIPMENT_LABELS, removeSetMessage, exerciseTargetLabel, focusExerciseIndex, formatPreviousSet, nextGroupMember, latestLoggedAt, panelSetIndex, reconcileRest, restAfterSet, resumedRest, roundRows, sessionBlocks, setPairLabel, type RestCheck, setPanelRestLabel, setPanelStatus, upNextQueue, WORKOUT_LABELS } from '../../src/shared/workoutDisplay'
 import { catalogueMeta, sessionRoles } from '../../src/shared/nextSessionRecommendation'
 import { groupRestSec } from '../../src/shared/compression'
 import { planCut } from '../../src/shared/sessionCut'
@@ -704,6 +704,8 @@ function WorkoutLedger({ uid, session, units, sessionKey, history, editing, curr
 
 // In memory for this process; a fresh process takes the rest back from the latest logged set, without +30 s or Skip.
 let restChecked: RestCheck | null = null
+// When the last rest was started or skipped: adding a set brings back only the rest of a set logged after that.
+let restHandled: RestCheck | null = null
 
 function RestBar({ rest, label, onAddTime, onSkip }: { rest: Rest; label: string; onAddTime: (seconds: number) => void; onSkip: () => void }) {
   const [now, setNow] = useState(Date.now())
@@ -847,7 +849,10 @@ function SessionScreen({ user }: { user: AuthUser }) {
   const [selectedSet, setSelectedSet] = useState<{ exerciseId: string; setId: string } | null>(null)
   const weightInput = useRef<TextInput>(null)
   const [weightFocus, setWeightFocus] = useState(0)
-  const changeRest = setRest
+  const changeRest = (next: Rest | null) => {
+    if (next && next.startedAt !== getRest()?.startedAt) restHandled = { sessionId: next.sessionId, at: Date.now() }
+    setRest(next)
+  }
   const insets = useSafeAreaInsets()
   const { closure, completed, locked, handingOff, canEdit: canEditClosure, start: startClosure, retry: retryClosure, dismiss: dismissClosure } = closureRuntime
   const sessionClosed = state.status === 'ready' && completed?.action === 'finish'
@@ -1060,6 +1065,7 @@ function SessionScreen({ user }: { user: AuthUser }) {
   // A set or exercise added after the session's last open set was logged brings back the rest after that set.
   const resumeRest = () => {
     if (!liveSession || getRest()) return
+    if (restHandled?.sessionId === liveSession.sessionId && latestLoggedAt(liveSession.exercises) <= restHandled.at) return
     const resumed = resumedRest(liveSession.exercises, sessionRoles(liveSession.exercises), liveSession.compression?.shortRest === true, Date.now())
     if (resumed) changeRest({ sessionId: liveSession.sessionId, ...resumed })
   }
@@ -1218,7 +1224,10 @@ function SessionScreen({ user }: { user: AuthUser }) {
         nextName={nextExerciseIndex >= 0 ? liveSession?.exercises[nextExerciseIndex]?.name ?? null : null}
         editing={panelEditing}
         rest={currentRest && <RestBar rest={currentRest} label={setPanelRestLabel(panelExercise.sets[currentSetIndex], currentSetIndex)}
-          onAddTime={(seconds) => changeRest({ ...currentRest, totalSec: currentRest.totalSec + seconds })} onSkip={() => changeRest(null)} />}
+          onAddTime={(seconds) => changeRest({ ...currentRest, totalSec: currentRest.totalSec + seconds })} onSkip={() => {
+            restHandled = { sessionId: currentRest.sessionId, at: Date.now() }
+            changeRest(null)
+          }} />}
         onLog={() => { const set = panelExercise.sets[currentSetIndex]; Keyboard.dismiss(); if (set) toggleSet(panelExercise.clientId, set.clientId, true) }}
         onClearSelection={() => setSelectedSet(null)}
         onNext={() => { const next = liveSession?.exercises[nextExerciseIndex]; if (next) goToExercise(exerciseIdentity(next, nextExerciseIndex)) }}

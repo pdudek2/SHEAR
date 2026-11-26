@@ -369,7 +369,7 @@ export default function WorkoutPage() {
     useWorkoutStore.getState().addRestTimerSeconds(deltaSec)
   }, [])
 
-  const handleSkipRest = useCallback(() => useWorkoutStore.getState().clearRestTimer(), [])
+  const handleSkipRest = useCallback(() => useWorkoutStore.getState().skipRest(), [])
 
   const handleUpdateSet = useCallback((exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => {
     useWorkoutStore.getState().updateSet(exerciseIndex, setIndex, field, value)

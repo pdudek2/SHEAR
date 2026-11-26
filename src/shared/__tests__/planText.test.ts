@@ -200,6 +200,38 @@ describe('parsePlanText: days, title and skipped lines', () => {
     expect([typo.name, typo.match.status]).toEqual(['Power', 'unknown'])
     expect(days('Day 1\nSquat\ndzień dobry')).toEqual([['Day 1', [['Squat', 'matched'], ['dzień dobry', 'matched']]]])
     expect(days('Day 1\nLeg curls\nSquat')).toEqual([['Day 1', [['Leg curls', 'matched'], ['Squat', 'matched']]]])
+    expect(days('Day 1\nLeg presses\nSquat')[0]![1]![0]).toEqual(['Leg presses', 'matched'])
+  })
+
+  it('reads names without numbers as 4×8 only when no line has numbers, and lists the other lines as not added', () => {
+    // The paste sheet says so: leave the numbers out of every line, or write them on every line.
+    const mixed = parsePlanText('Squat 5x5\nBench press 5x5\nPlank\nFace pull')
+    expect(mixed.days.map((day) => [day.name, day.exercises.map((exercise) => exercise.name)])).toEqual([['Day 1', ['Squat', 'Bench press']]])
+    expect(mixed.skipped.map(({ line, reason }) => [line, reason])).toEqual([[3, 'emptyDay'], [4, 'emptyDay']])
+    expect(parsePlanText('Push\nBench press 4x8\nOverhead press\nTricep pushdown\n\nPull\nPull-up\nBarbell row 4x8').skipped.map(({ line }) => line)).toEqual([3, 4, 6])
+    expect(parsePlanText('Day 1\nSquat\nBench press 3x8 60kg\nDeadlift').skipped.map(({ line }) => line)).toEqual([4])
+  })
+
+  it('reads decorated day names, misspelt exercises and colon lists the way they are meant', () => {
+    const days = (text: string) => parsePlanText(text).days.map((day) => [day.name, day.exercises.map((exercise) => exercise.name)])
+    expect(days('Upper A\nBench press\nLower A\nSquat\nUpper B\nOverhead press\nLower B\nDeadlift')).toEqual([
+      ['Upper A', ['Bench press']], ['Lower A', ['Squat']], ['Upper B', ['Overhead press']], ['Lower B', ['Deadlift']],
+    ])
+    expect(days('Chest & Triceps\nBench press\nBack & Biceps\nPull-up')).toEqual([['Chest & Triceps', ['Bench press']], ['Back & Biceps', ['Pull-up']]])
+    expect(days('Klatka i triceps\nBench press\nPlecy i biceps\nPull-up').map(([name]) => name)).toEqual(['Klatka i triceps', 'Plecy i biceps'])
+    expect(days('Push day\nBench press\nPull day\nPull-up\nLeg day\nSquat').map(([name]) => name)).toEqual(['Push day', 'Pull day', 'Leg day'])
+    expect(days('Push (chest, shoulders)\nBench press\nPull (back)\nPull-up').map(([name]) => name)).toEqual(['Push (chest, shoulders)', 'Pull (back)'])
+    expect(days('Cardio\nTreadmill\nLegs\nSquat').map(([name]) => name)).toEqual(['Cardio', 'Legs'])
+    // A misspelt exercise is a row to confirm, never a day.
+    const typo = parsePlanText('Dedlift\nSquat\nBench press').days
+    expect(typo.map((day) => [day.name, day.exercises.map((exercise) => [exercise.name, exercise.match.status])]))
+      .toEqual([['Day 1', [['Dedlift', 'unknown'], ['Squat', 'matched'], ['Bench press', 'matched']]]])
+    expect(typo[0]!.exercises[0]!.match).toMatchObject({ suggestions: [expect.objectContaining({ exerciseId: 'deadlift' })] })
+    expect(days('Day 1\nSquat\n\nDedlift\nBench press')).toEqual([['Day 1', ['Squat', 'Dedlift', 'Bench press']]])
+    // A colon after an exercise name makes a day only above plain exercise lines; a comment does not count.
+    expect(days('Squat:\nBench press:\nDeadlift:')).toEqual([['Day 1', ['Squat', 'Bench press', 'Deadlift']]])
+    expect(days('Squat:\nBack squat\nLeg press\nBench press:\nIncline bench press').map(([name]) => name)).toEqual(['Squat', 'Bench press'])
+    expect(days('Day 1\nSquat // heavy:\nBench press')).toEqual([['Day 1', ['Squat', 'Bench press']]])
   })
 
   it('reads a names-only list only when no line with numbers was rejected, and caps a day', () => {
@@ -460,6 +492,11 @@ describe('catalogue', () => {
     expect(searchExercises('barbell squat').map((exercise) => exercise.id)).toContain('squat')
     expect(matchesExerciseQuery({ name: 'Жим лёжа' }, 'жим')).toBe(true)
     expect(matchesExerciseQuery({ name: 'Plank' }, 'жим')).toBe(false)
+    // A main muscle ranks above a secondary one; "abs" is the core.
+    const shoulders = searchExercises('shoulders')
+    expect(shoulders[0]!.muscles[0]).toBe('shoulders')
+    expect(searchExercises('glute')[0]!.muscles[0]).toBe('glutes')
+    expect(searchExercises('abs').map((exercise) => exercise.category)).toContain('core')
   })
 })
 

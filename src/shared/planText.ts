@@ -348,40 +348,50 @@ function fold(all: SetGroup[]): { sets: number; reps: number; weight: number; si
 type Block = { header: { name: string; line: number } | null; exercises: ParsedExercise[]; overflow: number[] }
 
 // Words that name a training day in a split; they are days when an exercise follows them.
-const SPLIT_WORDS = new Set(['push', 'pull', 'legs', 'upper', 'lower', 'upper body', 'lower body', 'full body', 'fbw', 'arms',
-  'gora', 'dol', 'gora ciala', 'dol ciala', 'cale cialo', 'pchanie', 'ciagniecie', 'ramiona', 'rece', ...Object.keys(GENERIC_NAMES)])
+const SPLIT_WORDS = new Set(['push', 'pull', 'legs', 'leg', 'upper', 'lower', 'upper body', 'lower body', 'full body', 'fbw', 'arms', 'arm',
+  'shoulder', 'glute', 'cardio', 'gora', 'dol', 'gora ciala', 'dol ciala', 'cale cialo', 'pchanie', 'ciagniecie', 'ramiona', 'rece',
+  ...Object.keys(GENERIC_NAMES)])
+// "Upper A", "Push 1", "Leg day", "Chest & Triceps", "Klatka i triceps", "Push (chest, shoulders)": every part a split word.
 const splitDay = (name: string) => {
-  const core = normalizeExerciseName(name).replace(/\b(?:day|dzien|trening|training|workout)\b/g, ' ').replace(/\s+/g, ' ').trim()
-  return SPLIT_WORDS.has(core) || /^[a-e]$/.test(core)
+  const parts = name.replace(/\([^)]*\)/g, ' ').split(/\s*[&+/]\s*|\s+(?:and|i|oraz)\s+/i).map((part) => normalizeExerciseName(part)
+    .replace(/\b(?:day|dzien|trening|training|workout)\b/g, ' ').replace(/\s+/g, ' ').trim().replace(/\s+(?:[a-e]|\d+)$/, ''))
+  return parts.length === 1 && /^[a-e]$/.test(parts[0]!) || parts.every((part) => SPLIT_WORDS.has(part))
 }
 const isExercise = (match: NameMatch) => match.status === 'matched' && match.via !== 'typo'
 
-// Exact names, a simple plural read as its singular ("Leg curls"); a typo is only a suggestion here, since nothing
-// else on the line says this is an exercise ("Lower" is not Stationary Bike).
-function nameOnlyMatch(name: string, userExercises: MatchCandidate[]): NameMatch {
+// Exact names, a simple plural read as its singular ("Leg curls", "Leg presses"); a typo is only a suggestion here, since
+// nothing else on the line says this is an exercise ("Lower" is not Stationary Bike).
+function nameOnlyMatch(name: string, userExercises: MatchCandidate[]): { match: NameMatch; typo: boolean } {
   let match = matchExerciseName(name, userExercises)
-  if (!isExercise(match) && /[a-z]s$/i.test(name.trim())) {
-    const singular = matchExerciseName(name.trim().slice(0, -1), userExercises)
+  for (const cut of [2, 1]) {
+    if (isExercise(match) || !new RegExp(`[a-z]${cut === 2 ? 'es' : 's'}$`, 'i').test(name.trim())) continue
+    const singular = matchExerciseName(name.trim().slice(0, -cut), userExercises)
     if (isExercise(singular)) match = singular
   }
-  return match.status === 'matched' && match.via === 'typo' ? { status: 'unknown', suggestions: [match.exercise] } : match
+  return match.status === 'matched' && match.via === 'typo'
+    ? { match: { status: 'unknown', suggestions: [match.exercise] }, typo: true }
+    : { match, typo: false }
 }
 
 // A list of names without sets (a trainer's note, a beginner's plan): every line was read as a day. When some of them
 // are exercises, they get the editor's starting 4×8 to check. A heading ("Upper:", "## Push"), a calendar word, a split
-// word before an exercise, or an unknown name that opens a paragraph stays a day.
+// word before an exercise, or an unknown name that opens a paragraph stays a day; a misspelt exercise stays a row.
 function namesOnly(headers: { name: string; line: number }[], lines: string[], userExercises: MatchCandidate[], skipped: ParsedPlan['skipped']): Block[] {
-  const matches = headers.map((header) => nameOnlyMatch(header.name, userExercises))
-  if (!matches.some(isExercise)) return headers.map((header) => ({ header, exercises: [], overflow: [] }))
+  const read = headers.map((header) => ({ ...nameOnlyMatch(header.name, userExercises), heading: /^\s*#|:\s*$/.test(stripComment(lines[header.line - 1]!).text) }))
+  if (!read.some(({ match }) => isExercise(match))) return headers.map((header) => ({ header, exercises: [], overflow: [] }))
   const blocks: Block[] = []
   headers.forEach((header, index) => {
-    const match = matches[index]!
+    const { match, typo, heading } = read[index]!
+    const next = read[index + 1]
+    const exerciseFollows = Boolean(next && isExercise(next.match))
     const source = lines[header.line - 1]!
     const opens = !index || !lines[header.line - 2]?.trim()
-    const heading = /^\s*#|:\s*$/.test(source)
-    const day = heading || (!isExercise(match) && (CALENDAR.test(header.name.replace(/[\s\d.:#-]+.*$/, ''))
-      || (splitDay(header.name) && isExercise(matches[index + 1] ?? { status: 'unknown', suggestions: [] }))
-      || (match.status === 'unknown' && opens)))
+    // "Squat:" names a day only above plain exercise lines; "Squat: / Bench press: / Deadlift:" is one day of three.
+    const day = heading
+      ? !isExercise(match) || (exerciseFollows && !next!.heading)
+      : !isExercise(match) && (CALENDAR.test(header.name.replace(/[\s\d.:#-]+.*$/, ''))
+        || (splitDay(header.name) && exerciseFollows)
+        || (match.status === 'unknown' && opens && !typo))
     if (day) {
       blocks.push({ header, exercises: [], overflow: [] })
       return

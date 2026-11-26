@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { stripWorkoutClientIds, useWorkoutStore } from './workoutStore'
 
 describe('workoutStore set steppers', () => {
@@ -81,6 +81,35 @@ describe('workoutStore set steppers', () => {
     store().clearRestTimer()
     store().addSet(0)
     expect(store().restTimer).toBeNull()
+  })
+
+  it('does not bring a started or skipped rest back when a set is removed and added again', () => {
+    useWorkoutStore.setState({ active: null, restTimer: null, restChecked: null, restHandled: null })
+    let now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => (now += 1000))
+    const store = () => useWorkoutStore.getState()
+    store().startWorkout()
+    store().addExercise('squat', 'Squat', 'global')
+    store().updateSet(0, 0, 'weight', '100')
+    store().updateSet(0, 0, 'reps', '5')
+    store().addSet(0)
+    store().toggleSetDone(0, 0)
+    store().startRestTimer(180)
+    store().skipRest()
+    store().removeSet(0, 1)
+    store().addSet(0)
+    expect(store().restTimer).toBeNull()
+
+    // All sets done, Add set brings the rest; Skip, remove and add again does not.
+    store().toggleSetDone(0, 1)
+    store().clearRestTimer()
+    store().addSet(0)
+    expect(store().restTimer).not.toBeNull()
+    store().skipRest()
+    store().removeSet(0, 2)
+    store().addSet(0)
+    expect(store().restTimer).toBeNull()
+    clock.mockRestore()
   })
 
   it('accumulates rapid weight adjustments from the latest store value', () => {
@@ -284,6 +313,22 @@ describe('workoutStore completed set validation', () => {
     load(['80', '80.0', '80', '80'], [0, 2])
     store().updateSet(0, 0, 'weight', '82.5')
     expect(weights()).toEqual(['82.5', '82.5', '80', '80'])
+
+    // A weight cleared or stepped to 0 (a bodyweight set) reaches the followers too.
+    load(['8', '8', '8'], [0])
+    store().updateSet(0, 0, 'weight', '')
+    expect(weights()).toEqual(['', '', ''])
+    load(['5', '5', '5'], [0])
+    store().adjustSet(0, 0, 'weight', -2.5)
+    store().adjustSet(0, 0, 'weight', -2.5)
+    expect(weights()).toEqual(['0', '0', '0'])
+
+    // A follower something else changed since leaves the correction.
+    load(['100', '100', '100'], [0])
+    store().updateSet(0, 0, 'weight', '90')
+    store().applyOverload(0, { weight: 102.5 })
+    store().adjustSet(0, 0, 'weight', 2.5)
+    expect(weights()).toEqual(['92.5', '102.5', '102.5'])
 
     // A stale index changes nothing.
     expect(() => store().updateSet(0, 9, 'weight', '50')).not.toThrow()
