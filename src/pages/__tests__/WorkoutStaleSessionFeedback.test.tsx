@@ -566,15 +566,32 @@ describe('WorkoutPage stale-session feedback', () => {
     mocks.closureIntent = storedIntent
     mocks.closureState = 'closure_unconfirmed'
     mocks.staleSession = null
-    mocks.beginClosure.mockReturnValue(storedIntent)
-    mocks.finalizeWorkout.mockRejectedValue(new WorkoutClosureError('ambiguous', 'Could not confirm session closure.'))
+    // The closure state goes through the same cycle as in the hook: submitting, then unconfirmed again
+    mocks.beginClosure.mockImplementation(() => {
+      mocks.closureState = 'submitting'
+      return storedIntent
+    })
+    mocks.markClosureUnconfirmed.mockImplementation(() => { mocks.closureState = 'closure_unconfirmed' })
+    // The lifecycle turns an ambiguous failure into this result
+    let answer: (result: { status: 'closure_unconfirmed' }) => void = () => undefined
+    mocks.finalizeWorkout.mockImplementation(() => new Promise((resolve) => { answer = resolve }))
+    const focused: string[] = []
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement) {
+      focused.push(this.getAttribute('role') ?? this.tagName)
+    })
     try {
       const { rerender } = renderStaleSessionPage()
       await waitFor(() => expect(mocks.finalizeWorkout).toHaveBeenCalledWith('session-reloaded', 'revision-reloaded'))
+      expect(screen.queryByText('Could not confirm session closure.')).toBeNull()
+      expect(focused).not.toContain('alert')
+      answer({ status: 'closure_unconfirmed' })
+      await waitFor(() => expect(mocks.markClosureUnconfirmed).toHaveBeenCalled())
       rerender(createElement(MemoryRouter, null, createElement(WorkoutPage)))
       expect(await screen.findByRole('button', { name: 'Try again' })).toBeVisible()
+      expect(focused).toContain('alert')
       expect(mocks.finalizeWorkout).toHaveBeenCalledOnce()
     } finally {
+      focus.mockRestore()
       clearWorkoutClosureIntent('user-1')
     }
   })

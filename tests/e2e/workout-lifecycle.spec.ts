@@ -389,6 +389,50 @@ test.describe('Workout lifecycle Phase 1 regressions', () => {
     expect(await readLifecycleClosedSession(sessionId)).toMatchObject({ outcome: 'finished' })
   })
 
+  test('a finish left pending by a reload is refused when the session changed meanwhile, and the newer session stays', async ({
+    context,
+    cleanup,
+    expectedBrowserDiagnostics,
+    observedContextFactory,
+  }) => {
+    const sessionId = phase1Id('finish-stale-revision')
+    cleanup.add('remove Phase 1 workout lifecycle state', cleanupWorkoutLifecycleState)
+    await cleanupWorkoutLifecycleState()
+    await seedLifecycleActiveSession({ sessionId, label: 'Phase 1 finish stale revision' })
+    const { page } = await openWorkoutClient(observedContextFactory, await context.storageState())
+
+    // The finish never reaches the server, so its intent stays stored with the revision it was prepared on
+    await page.route('**/api/finalize-workout', (route) => route.abort('failed'))
+    await expectedBrowserDiagnostics.during(
+      'intentional Phase 1 finalize request loss',
+      isExpectedWorkoutLifecycleAckLossDiagnostic,
+      async () => {
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+        await page.getByRole('button', { name: 'Finish', exact: true }).click()
+        await expect(page.getByRole('alert')).toContainText('Could not confirm session closure.')
+      },
+    )
+    await page.unroute('**/api/finalize-workout')
+    await seedLifecycleActiveSession({ sessionId, label: 'Phase 1 finish stale revision', reps: '8' })
+
+    await expectedBrowserDiagnostics.allowing(
+      'finalize refused for an outdated revision',
+      (entry) => entry.kind === 'console' && (
+        (entry.message.includes('409 (Conflict)') && entry.url?.includes('/api/finalize-workout') === true)
+        || entry.message.startsWith('[finish workout closure error] WorkoutClosureError:')
+      ),
+      async () => {
+        await page.reload()
+        await expect(page.getByText('The session changed on another device. Check the data and finish it again.'))
+          .toBeVisible({ timeout: RESPONSE_TIMEOUT_MS })
+      },
+    )
+    expect(await readLifecycleWorkouts(sessionId)).toHaveLength(0)
+    expect((await readLifecycleActiveSession())?.exercises?.[0]?.sets?.[0]?.reps).toBe('8')
+    await expect(page).toHaveURL(/\/workout\/new$/)
+    await expect(page.getByRole('button', { name: 'Finish', exact: true })).toBeEnabled()
+  })
+
   test('lost ordinary discard acknowledgement stays on workout and succeeds on retry', async ({
     context,
     cleanup,
