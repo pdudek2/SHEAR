@@ -167,6 +167,22 @@ describe('parsePlanText: days, title and skipped lines', () => {
     expect(parsePlanText('Squat 3x5\nPush\nBench 3x5').days.map((day) => day.name)).toEqual(['Day 1', 'Push'])
   })
 
+  it('reads a list of names without sets as a plan with 4×8 to check', () => {
+    const plan = parsePlanText('Day 1\nSquat\nLeg curl\n\nDay 2\nBench press\nRow')
+    expect(plan.days.map((day) => [day.name, day.exercises.map((exercise) => [exercise.name, exercise.match.status, exercise.sets, exercise.targetReps, exercise.targetWeight, exercise.check])]))
+      .toEqual([
+        ['Day 1', [['Squat', 'matched', 4, 8, 0, 'Squat'], ['Leg curl', 'matched', 4, 8, 0, 'Leg curl']]],
+        ['Day 2', [['Bench press', 'matched', 4, 8, 0, 'Bench press'], ['Row', 'unknown', 4, 8, 0, 'Row']]],
+      ])
+    expect(plan.name).toBeNull()
+    const titled = parsePlanText('My split\n\nUpper\nBench press\nOut odwodziciel\nDay 2\nSquat')
+    expect(titled.name).toBe('My split')
+    expect(titled.days.map((day) => [day.name, day.exercises.map((exercise) => exercise.name)]))
+      .toEqual([['Upper', ['Bench press', 'Out odwodziciel']], ['Day 2', ['Squat']]])
+    expect(parsePlanText('Squat\nDeadlift').days).toEqual([expect.objectContaining({ name: 'Day 1', exercises: [expect.objectContaining({ name: 'Squat' }), expect.objectContaining({ name: 'Deadlift' })] })])
+    expect(parsePlanText('Monday\nTuesday\nRest').days).toEqual([])
+  })
+
   it('puts every line somewhere: a day, an exercise or a skipped line with a reason', () => {
     const text = 'Plan\nWeek 1\nPush\nBench 3x5\n// only a comment\nSquat 3x5 5000 kg\nExtras\n'
     const plan = parsePlanText(text)
@@ -405,6 +421,10 @@ describe('catalogue', () => {
   it('finds an exercise by a Polish name in search', () => {
     expect(searchExercises('przysiad').map((exercise) => exercise.id)).toContain('squat')
     expect(searchExercises('push-up').map((exercise) => exercise.id)).toContain('push-up')
+    const curls = searchExercises('biceps curl').map((exercise) => exercise.id)
+    expect(curls).toContain('barbell-curl')
+    expect(curls.every((id) => exercises.find((exercise) => exercise.id === id)!.muscles.includes('biceps'))).toBe(true)
+    expect(searchExercises('curl', 'arms').length).toBeGreaterThan(0)
   })
 })
 

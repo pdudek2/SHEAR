@@ -1,7 +1,7 @@
 import type { ActiveWorkout, WorkoutExercise, WorkoutSet } from './session'
 import { createLocalId } from './session'
 import { clampSetValue, completedSetError, isValidCompletedSet, MAX_DONE_SETS_PER_EXERCISE, MAX_SESSION_EXERCISES } from '../../src/shared/workoutLimits'
-import { applyOverload as applyOverloadToSets, carryLoggedWeight } from '../../src/shared/nextSessionRecommendation'
+import { applyOverload as applyOverloadToSets, carryLoggedWeight, followCorrectedWeight } from '../../src/shared/nextSessionRecommendation'
 
 export { MAX_SESSION_EXERCISES }
 
@@ -15,9 +15,11 @@ function updateTarget(
 ): ActiveWorkout {
   return {
     ...session,
-    exercises: session.exercises.map((exercise) => exercise.clientId === exerciseId
-      ? { ...exercise, sets: exercise.sets.map((set) => set.clientId === setId ? update(set) : set) }
-      : exercise),
+    exercises: session.exercises.map((exercise) => {
+      const index = exercise.clientId === exerciseId ? exercise.sets.findIndex((set) => set.clientId === setId) : -1
+      if (index < 0) return exercise
+      return { ...exercise, sets: followCorrectedWeight(exercise.sets.map((set, other) => other === index ? update(set) : set), index, exercise.sets[index]!) }
+    }),
   }
 }
 

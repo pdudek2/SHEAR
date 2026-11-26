@@ -3,7 +3,7 @@ import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 
-import { exercises as exerciseDb, searchExercises, type Category } from '../../data/exercises'
+import { exercises as exerciseDb, matchesExerciseQuery, searchExercises, type Category } from '../../data/exercises'
 import { EXERCISE_CATEGORY_LABELS, getEquipmentLabel } from '../../src/lib/exerciseLabels'
 import type { RecentExercisePick } from '../../src/shared/recentExercises'
 import type { ExerciseRef } from '../../src/shared/exerciseMatch'
@@ -33,12 +33,11 @@ export default function ExercisePicker({ userExercises, recent = [], suggestions
   const insets = useSafeAreaInsets()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<Category | 'all'>('all')
-  const q = query.toLowerCase()
-  const filtered = q !== '' || category !== 'all'
+  const filtered = query.trim() !== '' || category !== 'all'
   // Matches web ordering: the user's own exercises first, then the shared library.
   const results: PickerResult[] = [
     ...(userExercises.status === 'ready' ? userExercises.data : [])
-      .filter((exercise) => (!q || exercise.name.toLowerCase().includes(q)) && (category === 'all' || exercise.category === category))
+      .filter((exercise) => matchesExerciseQuery(exercise, query) && (category === 'all' || exercise.category === category))
       .map((exercise) => ({ ...exercise, source: 'user' as const })),
     ...searchExercises(query, category === 'all' ? undefined : category).map((exercise) => ({ ...exercise, source: 'global' as const })),
   ]
@@ -66,6 +65,9 @@ export default function ExercisePicker({ userExercises, recent = [], suggestions
         <Svg width={16} height={16} viewBox="0 0 24 24"><Path d="m21 21-4.34-4.34M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z" fill="none" stroke={colors.muted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></Svg>
         <TextInput accessibilityLabel="Search exercises" onChangeText={setQuery} placeholder="Search exercises" placeholderTextColor={colors.mutedSoft}
           returnKeyType="search" {...fieldColors} style={styles.pickerSearchInput} value={query} />
+        {query !== '' && <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setQuery('')} hitSlop={8} style={styles.pickerClear}>
+          <Svg width={16} height={16} viewBox="0 0 24 24"><Path d="M18 6 6 18M6 6l12 12" fill="none" stroke={colors.muted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></Svg>
+        </Pressable>}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.pickerCategoriesBar} contentContainerStyle={styles.pickerCategories}
         accessibilityLabel="Exercise category">
@@ -93,7 +95,7 @@ export default function ExercisePicker({ userExercises, recent = [], suggestions
         </>}
         ListEmptyComponent={userExercises.status === 'ready' ? <View style={styles.pickerEmpty}>
           <Text style={styles.pickerEmptyTitle}>No results</Text>
-          <Text style={styles.pickerEmptyCopy}>Change your search or choose another category.</Text>
+          <Text style={styles.pickerEmptyCopy}>{category === 'all' ? 'Try a shorter name, like “curl”, or clear the search.' : 'Change your search or choose All.'}</Text>
         </View> : null}
         renderItem={({ item }) => row(item)}
       />
@@ -108,6 +110,7 @@ const styles = StyleSheet.create({
   pickerMeta: { color: colors.muted, flexShrink: 0, fontFamily: 'InstrumentSans_400Regular', fontSize: 13.5, fontVariant: ['tabular-nums'] },
   pickerPressed: { opacity: 0.6 },
   pickerSearch: { alignItems: 'center', backgroundColor: 'rgba(244, 238, 232, 0.08)', borderRadius: 12, flexDirection: 'row', gap: 8, height: 42, paddingHorizontal: 12 },
+  pickerClear: { alignItems: 'center', height: 42, justifyContent: 'center', marginRight: -12, width: 44 },
   pickerSearchInput: { color: colors.textStrong, flex: 1, fontFamily: 'InstrumentSans_400Regular', fontSize: 14.5, padding: 0 },
   pickerCategoriesBar: { flexGrow: 0, marginRight: -20, marginTop: 10 },
   pickerCategories: { gap: 6, paddingRight: 20 },

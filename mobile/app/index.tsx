@@ -728,9 +728,9 @@ function RestBar({ rest, label, onAddTime, onSkip }: { rest: Rest; label: string
       <Text style={styles.restLabel}>{label}</Text>
       <Text style={styles.restValue}>{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}</Text>
     </>}
-    {!finished && <Pressable accessibilityRole="button" accessibilityLabel="Add 30 seconds" onPress={() => onAddTime(30)} style={[styles.restAction, styles.restAddTime]}><Text style={styles.restActionText}>+30 s</Text></Pressable>}
+    {!finished && <Pressable accessibilityRole="button" accessibilityLabel="Add 30 seconds" onPress={() => onAddTime(30)} style={[styles.restAction, styles.restAddTime]}><Text numberOfLines={1} style={styles.restActionText}>+30 s</Text></Pressable>}
     <View style={styles.flex} />
-    <Pressable accessibilityRole="button" accessibilityLabel="Skip rest" onPress={onSkip} style={styles.restAction}><Text style={styles.restActionText}>Skip</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Skip rest" onPress={onSkip} style={styles.restAction}><Text numberOfLines={1} style={styles.restActionText}>Skip</Text></Pressable>
   </View>
 }
 

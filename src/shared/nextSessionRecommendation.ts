@@ -63,6 +63,13 @@ export function carryLoggedWeight<T extends { weight: string; done: boolean }>(s
   })
 }
 
+// Correcting the weight of a logged set corrects the open sets after it that the slip had carried to.
+export function followCorrectedWeight<T extends { weight: string; done: boolean }>(sets: T[], index: number, before: T): T[] {
+  const edited = sets[index]
+  if (!before.done || !edited || edited.weight === before.weight) return sets
+  return sets.map((set, other) => (other > index && !set.done && set.weight === before.weight ? { ...set, weight: edited.weight } : set))
+}
+
 export interface NextSessionExercise {
   exerciseId: string
   exerciseSource: ExerciseSource

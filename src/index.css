@@ -8476,7 +8476,7 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
 }
 
 .paste-plan-field::placeholder {
-  color: var(--muted);
+  color: var(--muted-soft);
 }
 
 .paste-plan-error {
@@ -8484,6 +8484,19 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
   color: var(--danger);
   font-size: 0.8125rem;
   line-height: 1.45;
+}
+
+.paste-plan-error p {
+  margin: 0;
+}
+
+.paste-plan-manual {
+  margin-top: 0.35rem;
+  padding: 0.5rem 0;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
 .paste-plan-continue {
@@ -9084,6 +9097,16 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
   outline-offset: 1px;
 }
 
+.exercise-picker-clear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.625rem;
+  margin-right: -0.75rem;
+  color: var(--muted);
+}
+
 .exercise-picker-categories {
   display: flex;
   flex: none;
@@ -9167,7 +9190,8 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
 .exercise-picker-empty {
   display: grid;
   gap: 0.35rem;
-  place-items: center;
+  place-content: center;
+  justify-items: center;
   min-height: 13rem;
   text-align: center;
 }
@@ -9370,9 +9394,11 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
 }
 
 .workout-set-panel .rest-timer-action {
+  flex: none;
   min-width: 2.75rem;
   min-height: 2.75rem;
   padding: 0 0.5rem;
+  white-space: nowrap;
   border: 0;
   background: none;
   color: var(--text);
@@ -9430,6 +9456,12 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
 
 .workout-set-num label:focus-within {
   background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* The ring goes round the value and its unit, not across the input's enlarged tap area. */
+.workout-set-num input:focus {
+  box-shadow: none !important;
 }
 
 /* The 44 px tap area overflows into the label's padding so the panel keeps its height. */
@@ -10157,14 +10189,6 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
   justify-content: flex-start;
 }
 
-.workout-focus-shell:not(.landing-demo) .workout-set-row[data-done] .workout-set-today {
-  color: var(--muted);
-}
-
-.workout-focus-shell:not(.landing-demo) .workout-set-row[data-done] .workout-set-toggle {
-  color: var(--muted);
-}
-
 .workout-group {
   padding-block: 0.75rem 0.25rem;
 }
@@ -10266,6 +10290,7 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
 }
 
 .workout-focus-shell:not(.landing-demo) .workout-set-panel .rest-timer-label {
+  min-width: 0;
   flex-wrap: wrap;
   align-items: baseline;
   column-gap: 0.5rem;

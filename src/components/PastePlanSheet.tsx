@@ -6,7 +6,7 @@ import { useProfileStore } from '../store/profileStore'
 import { useUserExercises } from '../hooks/useUserExercises'
 import { importPlanText } from '../shared/planImport'
 
-const EXAMPLE = 'Upper\nBench press 4x8 60 kg\nPull-up 3x8\n\nLower\nSquat 3x5 @80'
+const EXAMPLE = 'Example:\nUpper\nBench press 4x8 60 kg\nPull-up 3x8\n\nLower\nSquat 3x5 @80'
 
 // `returnTo` is where the editor goes after saving; from Train it is Train, from the plan list the list.
 export default function PastePlanSheet({ onClose, returnTo }: { onClose: () => void; returnTo?: string }) {
@@ -15,7 +15,7 @@ export default function PastePlanSheet({ onClose, returnTo }: { onClose: () => v
   const { state } = useUserExercises(user?.uid ?? null)
   const units = useProfileStore((store) => store.profile?.units)
   const [text, setText] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(false)
   const fieldRef = useRef<HTMLTextAreaElement>(null)
   const helpId = useId()
   const errorId = useId()
@@ -28,7 +28,7 @@ export default function PastePlanSheet({ onClose, returnTo }: { onClose: () => v
       : []
     const pasted = importPlanText(text, userExercises, units)
     if (!pasted) {
-      setError('No exercises found. Write one exercise per line with its sets, like “Bench press 4x8 60 kg”.')
+      setError(true)
       fieldRef.current?.focus()
       return
     }
@@ -51,10 +51,21 @@ export default function PastePlanSheet({ onClose, returnTo }: { onClose: () => v
         maxLength={20000}
         onChange={(event) => {
           setText(event.target.value)
-          if (error) setError(null)
+          if (error) setError(false)
         }}
       />
-      {error && <p id={errorId} role="alert" className="paste-plan-error">{error}</p>}
+      {error && (
+        <div id={errorId} role="alert" className="paste-plan-error">
+          <p>No exercises found. Write one exercise per line, like “Bench press 4x8 60 kg”, or build the plan by hand.</p>
+          <button
+            type="button"
+            className="paste-plan-manual"
+            onClick={() => navigate('/templates/new', returnTo ? { state: { returnTo } } : undefined)}
+          >
+            Build it by hand
+          </button>
+        </div>
+      )}
       <button
         type="button"
         className="planner-primary-action paste-plan-continue disabled:opacity-60"

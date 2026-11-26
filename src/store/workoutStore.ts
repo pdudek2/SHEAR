@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { createSessionId } from '../lib/sessionIdentity'
 import { clampSetValue, isValidCompletedSet, MAX_DONE_SETS_PER_EXERCISE, MAX_SESSION_EXERCISES } from '../shared/workoutLimits'
-import { applyOverload, carryLoggedWeight } from '../shared/nextSessionRecommendation'
+import { applyOverload, carryLoggedWeight, followCorrectedWeight, sessionRoles } from '../shared/nextSessionRecommendation'
+import { reconcileRest, type RestCheck } from '../shared/workoutDisplay'
 import type { CompressionProposal, CompressionRecord } from '../shared/compressionRecord'
 import { cutRest } from '../shared/sessionCut'
 import type { CutChoice } from '../shared/sessionCut'
@@ -47,6 +48,8 @@ export interface RestTimerState {
 interface WorkoutState {
   active: ActiveWorkout | null
   restTimer: RestTimerState | null
+  // The newest logged set already checked for a rest to bring back, as on Android.
+  restChecked: RestCheck | null
   startWorkout: () => void
   hydrateFromDoc: (workout: ActiveWorkout) => void
   startRestTimer: (totalSec: number, startedAt?: number) => void
@@ -135,15 +138,22 @@ function formatAdjustedSetValue(value: number, field: 'weight' | 'reps'): string
 export const useWorkoutStore = create<WorkoutState>()((set) => ({
   active: null,
   restTimer: null,
+  restChecked: null,
 
   startWorkout: () =>
     set({ active: { sessionId: createSessionId(), startedAt: Date.now(), templateId: null, planDayId: null, exercises: [] }, restTimer: null }),
 
+  // A reload or another device's log brings back the rest still running after the newest logged set.
   hydrateFromDoc: (workout) =>
-    set((state) => ({
-      active: withClientIds(workout, state.active),
-      restTimer: state.active?.sessionId === workout.sessionId ? state.restTimer : null,
-    })),
+    set((state) => {
+      const current = state.active?.sessionId === workout.sessionId && state.restTimer ? { sessionId: workout.sessionId, ...state.restTimer } : null
+      const next = reconcileRest(current, state.restChecked, workout, sessionRoles(workout.exercises), workout.compression?.shortRest === true, Date.now())
+      return {
+        active: withClientIds(workout, state.active),
+        restTimer: next.rest === current ? (current && state.restTimer) : next.rest && { startedAt: next.rest.startedAt, totalSec: next.rest.totalSec },
+        restChecked: next.checked,
+      }
+    }),
 
   startRestTimer: (totalSec, startedAt = Date.now()) =>
     set({ restTimer: { startedAt, totalSec } }),
@@ -203,11 +213,11 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
         i === exerciseIndex
           ? {
               ...ex,
-              sets: ex.sets.map((st, si) => {
+              sets: followCorrectedWeight(ex.sets.map((st, si) => {
                 if (si !== setIndex) return st
                 const next = { ...st, [field]: value }
                 return settleDone(next, next.done && isValidCompletedSet(next))
-              }),
+              }), setIndex, ex.sets[setIndex]!),
             }
           : ex
       )
@@ -230,12 +240,12 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
         i === exerciseIndex
           ? {
               ...ex,
-              sets: ex.sets.map((st, si) => {
+              sets: followCorrectedWeight(ex.sets.map((st, si) => {
                 if (si !== setIndex) return st
                 const current = parseSetNumber(st[field], field)
                 const next = { ...st, [field]: formatAdjustedSetValue(clampSetValue(current + delta, field), field) }
                 return settleDone(next, next.done && isValidCompletedSet(next))
-              }),
+              }), setIndex, ex.sets[setIndex]!),
             }
           : ex
       )

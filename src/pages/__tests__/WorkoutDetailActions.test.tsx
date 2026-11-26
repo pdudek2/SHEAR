@@ -189,7 +189,7 @@ describe('WorkoutDetailPage delete action', () => {
 
     expect(await screen.findByRole('heading', { name: 'Workout saved' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Push day' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Home' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Train' }))
 
     expect(await screen.findByText('Dashboard home')).toBeInTheDocument()
   })
@@ -284,7 +284,7 @@ describe('WorkoutDetailPage delete action', () => {
       'Workout saved, but its summary could not load.',
     )
     expect(screen.queryByText('Workout not found.')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Back to Home' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to Train' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await act(async () => { retryRead.resolve(workout) })
 

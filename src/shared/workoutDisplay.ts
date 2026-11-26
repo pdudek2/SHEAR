@@ -95,7 +95,8 @@ export function upNextQueue(exercises: FlowExercise[], currentIndex: number): nu
 // Seconds of rest after the set just logged (the state already counts it); 0 while its round is still open.
 export function restAfterSet(exercises: FlowExercise[], exerciseIndex: number, roles: readonly Role[], shortRest: boolean): number {
   const exercise = exercises[exerciseIndex]
-  if (!exercise) return 0
+  // After the last open set of the session nothing is left to rest for: Finish comes next.
+  if (!exercise || exercises.every((other) => other.sets.every((set) => set.done))) return 0
   const role = roles[exerciseIndex] ?? 'compound'
   const round = exercise.sets.filter((set) => set.done).length
   const peers = exercise.group
@@ -140,6 +141,7 @@ export function panelSetIndex(sets: { clientId?: string; done: boolean }[], sele
   return selected >= 0 ? selected : sets.findIndex((set) => !set.done)
 }
 export function setPairLabel(set: Pick<DisplaySet, 'weight' | 'reps'>, units: WeightUnits): string {
+  if (!set.weight.trim() && !set.reps.trim()) return '—'
   return `${kgToDisplayWeight(parseWeight(set.weight), units)} × ${parseReps(set.reps)}`
 }
 export function exerciseTargetLabel(sets: DisplaySet[], units: WeightUnits): string {

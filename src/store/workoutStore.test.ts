@@ -22,6 +22,29 @@ describe('workoutStore set steppers', () => {
     expect(useWorkoutStore.getState().restTimer).toBeNull()
   })
 
+  it('brings back the rest still running after the newest logged set when the page loads it again', () => {
+    useWorkoutStore.setState({ active: null, restTimer: null, restChecked: null })
+    const now = Date.now()
+    const session = {
+      sessionId: 'session-reloaded',
+      startedAt: now - 600_000,
+      exercises: [{
+        exerciseId: 'squat',
+        exerciseSource: 'global' as const,
+        name: 'Squat',
+        sets: [{ weight: '100', reps: '5', done: true, completedAt: now - 10_000 }, { weight: '100', reps: '5', done: false }],
+      }],
+    }
+    useWorkoutStore.getState().hydrateFromDoc(session)
+    expect(useWorkoutStore.getState().restTimer).toMatchObject({ startedAt: now - 10_000 })
+    expect(useWorkoutStore.getState().restTimer!.totalSec).toBeGreaterThan(10)
+
+    // Skip stays skipped when the same session arrives again.
+    useWorkoutStore.getState().clearRestTimer()
+    useWorkoutStore.getState().hydrateFromDoc({ ...session, label: 'Legs' })
+    expect(useWorkoutStore.getState().restTimer).toBeNull()
+  })
+
   it('accumulates rapid weight adjustments from the latest store value', () => {
     const store = useWorkoutStore.getState()
     store.hydrateFromDoc({
@@ -185,6 +208,30 @@ describe('workoutStore completed set validation', () => {
     useWorkoutStore.getState().toggleSetDone(0, 0)
 
     expect(useWorkoutStore.getState().active?.exercises[0]?.sets[0]?.done).toBe(false)
+  })
+
+  it('corrects the open sets a mistyped logged weight was carried to', () => {
+    useWorkoutStore.getState().hydrateFromDoc({
+      sessionId: 'session-1',
+      startedAt: 1,
+      exercises: [{
+        exerciseId: 'squat',
+        exerciseSource: 'global',
+        name: 'Squat',
+        sets: [{ weight: '90', reps: '5', done: false }, { weight: '80', reps: '5', done: false }, { weight: '80', reps: '5', done: false }],
+      }],
+    })
+    useWorkoutStore.getState().toggleSetDone(0, 0)
+    const weights = () => useWorkoutStore.getState().active?.exercises[0]?.sets.map((set) => set.weight)
+    expect(weights()).toEqual(['90', '90', '90'])
+
+    useWorkoutStore.getState().updateSet(0, 0, 'weight', '80')
+    expect(weights()).toEqual(['80', '80', '80'])
+    useWorkoutStore.getState().adjustSet(0, 0, 'weight', 2.5)
+    expect(weights()).toEqual(['82.5', '82.5', '82.5'])
+    useWorkoutStore.getState().updateSet(0, 2, 'weight', '70')
+    useWorkoutStore.getState().updateSet(0, 0, 'weight', '80')
+    expect(weights()).toEqual(['80', '80', '70'])
   })
 
   it('allows a bodyweight set with repetitions and no weight', () => {

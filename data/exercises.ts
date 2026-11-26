@@ -112,12 +112,13 @@ export function normalizeExerciseName(value: string): string {
     .replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
+// Every word of the query appears in the name, an alias, a muscle or the category: "biceps curl" finds the curls.
+export function matchesExerciseQuery(exercise: { name: string; aliases?: readonly string[]; muscles?: readonly string[]; category?: string }, query: string): boolean {
+  const words = normalizeExerciseName(query).split(' ').filter(Boolean)
+  const text = [exercise.name, ...(exercise.aliases ?? []), ...(exercise.muscles ?? []), exercise.category ?? ''].map(normalizeExerciseName).join(' | ')
+  return words.every((word) => text.includes(word))
+}
+
 export function searchExercises(query: string, category?: Category): Exercise[] {
-  const normalizedQuery = normalizeExerciseName(query)
-  return exercises.filter((exercise) => (
-    (category ? exercise.category === category : true)
-    && (normalizedQuery
-      ? [exercise.name, ...(exercise.aliases ?? [])].some((name) => normalizeExerciseName(name).includes(normalizedQuery))
-      : true)
-  ))
+  return exercises.filter((exercise) => (category ? exercise.category === category : true) && matchesExerciseQuery(exercise, query))
 }

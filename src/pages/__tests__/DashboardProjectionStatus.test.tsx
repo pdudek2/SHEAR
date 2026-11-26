@@ -419,7 +419,7 @@ describe('Dashboard workout projection status', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: 'Return to workout' })).toHaveLength(1)
+      expect(screen.getAllByRole('button', { name: /^Resume / })).toHaveLength(1)
     })
     expect(screen.queryByRole('button', { name: 'Start empty workout' })).not.toBeInTheDocument()
     expect(useWorkoutStore.getState().active?.sessionId).toBe('remote-session')
@@ -507,7 +507,7 @@ describe('Dashboard workout projection status', () => {
     render(<DashboardPage />)
 
     await screen.findByRole('heading', { name: 'Workout' })
-    expect(screen.getByRole('button', { name: 'Return to workout' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Resume / })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /empty workout/i })).not.toBeInTheDocument()
     await waitFor(() => expect(mocks.getTemplates).toHaveBeenCalled())
     expect(screen.queryByText('Bench Press')).not.toBeInTheDocument()
@@ -1001,7 +1001,7 @@ describe('Dashboard workout projection status', () => {
     act(() => useWorkoutStore.getState().hydrateFromDoc({ sessionId: 'started', startedAt: Date.now(), exercises: [] }))
 
     expect(screen.getByRole('button', { name: 'Starting…' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Return to workout' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Resume / })).not.toBeInTheDocument()
     expect(screen.getByText('Bench Press')).toBeInTheDocument()
   })
 

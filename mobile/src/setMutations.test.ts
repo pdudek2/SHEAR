@@ -51,6 +51,19 @@ test('a set carries its completion time only while it is done', () => {
   assert.equal('completedAt' in updateSetValue(done, 'exercise-a', 'set-a', 'reps', '').exercises[0]!.sets[0]!, false)
 })
 
+test('correcting the weight of a logged set corrects the open sets the slip had carried to', () => {
+  const planned = updateSetValue(updateSetValue(workout(), 'exercise-a', 'set-b', 'weight', '80'), 'exercise-a', 'set-b', 'reps', '5')
+  const slipped = setSetDone(updateSetValue(planned, 'exercise-a', 'set-a', 'weight', '90'), 'exercise-a', 'set-a', true)
+  assert.equal(slipped.exercises[0]?.sets[1]?.weight, '90')
+  const corrected = updateSetValue(slipped, 'exercise-a', 'set-a', 'weight', '80')
+  assert.deepEqual(corrected.exercises[0]?.sets.map((set) => [set.weight, set.done]), [['80', true], ['80', false]])
+  const stepped = adjustSetValue(slipped, 'exercise-a', 'set-a', 'weight', -10)
+  assert.equal(stepped.exercises[0]?.sets[1]?.weight, '80')
+  // An open set the user changed on purpose keeps its weight.
+  const own = updateSetValue(slipped, 'exercise-a', 'set-b', 'weight', '95')
+  assert.equal(updateSetValue(own, 'exercise-a', 'set-a', 'weight', '80').exercises[0]?.sets[1]?.weight, '95')
+})
+
 test('completion enforces finalizer bounds and invalid reps unmark a set', () => {
   assert.equal(setSetDone(workout(), 'exercise-a', 'set-a', true).exercises[0]?.sets[0]?.done, true)
   const tooHeavy = updateSetValue(workout(), 'exercise-a', 'set-a', 'weight', '2000.1')

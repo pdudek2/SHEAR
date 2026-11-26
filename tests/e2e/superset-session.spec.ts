@@ -36,7 +36,7 @@ async function openPair(page: Page, request: APIRequestContext, hipWeight: strin
   })
 
   await page.goto('/dashboard')
-  await page.getByRole('button', { name: 'Return to workout' }).click()
+  await page.getByRole('button', { name: /^Resume / }).click()
   // B's suggestion comes from the same history as the slip check, so it shows the check is ready; then back to 1A.
   await page.getByRole('button', { name: /^1B, Hip Abduction/ }).click()
   await expect(page.getByText(/^Suggested/)).toBeVisible()

@@ -344,6 +344,29 @@ function fold(all: SetGroup[]): { sets: number; reps: number; weight: number; si
   }
 }
 
+type Block = { header: { name: string; line: number } | null; exercises: ParsedExercise[]; overflow: number[] }
+
+// A list of names without sets (a trainer's note, a beginner's plan): every line was read as a day. When some of them
+// are exercises, they get the editor's starting 4×8 to check; a line that opens a paragraph or names a day stays a day.
+function namesOnly(headers: { name: string; line: number }[], lines: string[], userExercises: MatchCandidate[]): Block[] {
+  const matches = headers.map((header) => matchExerciseName(header.name, userExercises))
+  if (!matches.some((match) => match.status === 'matched' && match.via !== 'typo')) return headers.map((header) => ({ header, exercises: [], overflow: [] }))
+  const blocks: Block[] = []
+  headers.forEach((header, index) => {
+    const match = matches[index]!
+    const opens = !index || !lines[header.line - 2]?.trim()
+    if (CALENDAR.test(header.name.replace(/[\s\d.:#-]+.*$/, '')) || (match.status === 'unknown' && opens)) {
+      blocks.push({ header, exercises: [], overflow: [] })
+      return
+    }
+    if (!blocks.length) blocks.push({ header: null, exercises: [], overflow: [] })
+    const source = lines[header.line - 1]!
+    blocks.at(-1)!.exercises.push({ line: header.line, source, name: header.name, note: null, sets: 4, targetReps: 8, targetWeight: 0,
+      simplified: false, match, duplicate: false, check: source.trim() })
+  })
+  return blocks
+}
+
 // A weight without a unit is in the user's units: "Squat 3x5 225" from a pounds user is 225 lb.
 export function parsePlanText(text: string, userExercises: MatchCandidate[] = [], units: WeightUnits = 'kg'): ParsedPlan {
   const lines = text.replace(/\r/g, '').split('\n')
@@ -512,6 +535,9 @@ export function parsePlanText(text: string, userExercises: MatchCandidate[] = []
     block.exercises.push(exercise)
   })
 
+  if (blocks.length && blocks.every((block) => block.header && !block.exercises.length)) {
+    blocks.splice(0, blocks.length, ...namesOnly(blocks.map((block) => block.header!), lines, userExercises))
+  }
   // Two headers before the first exercise: the first one names the plan.
   let planName: string | null = null
   if (blocks.length >= 2 && blocks[0]!.header && !blocks[0]!.exercises.length && blocks[1]!.header) {
