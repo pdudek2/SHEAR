@@ -110,6 +110,7 @@ vi.mock('../../store/workoutStore', () => {
     { getState: () => ({
       active: mocks.storeActive === undefined ? mocks.active : mocks.storeActive,
       removeExercise: mocks.removeExercise,
+      setExerciseMeta: vi.fn(),
     }) },
   )
   return { useWorkoutStore }

@@ -63,11 +63,26 @@ export function carryLoggedWeight<T extends { weight: string; done: boolean }>(s
   })
 }
 
-// Correcting the weight of a logged set corrects the open sets after it that the slip had carried to.
-export function followCorrectedWeight<T extends { weight: string; done: boolean }>(sets: T[], index: number, before: T): T[] {
-  const edited = sets[index]
-  if (!before.done || !edited || edited.weight === before.weight) return sets
-  return sets.map((set, other) => (other > index && !set.done && set.weight === before.weight ? { ...set, weight: edited.weight } : set))
+// Correcting the weight of a logged set corrects the open sets the slip had carried to: those after it, before the next
+// logged set, at its weight when the correction starts. They are chosen once, so a value passed on the way does not join.
+export function correctionFollowers(sets: { clientId?: string; weight: string; done: boolean }[], index: number): string[] {
+  const logged = sets[index]
+  const weight = Number.parseFloat(logged?.weight ?? '')
+  if (!logged?.done || !(weight > 0)) return []
+  const followers: string[] = []
+  for (const set of sets.slice(index + 1)) {
+    if (set.done) break
+    if (set.clientId && Math.abs(Number.parseFloat(set.weight) - weight) < 1e-6) followers.push(set.clientId)
+  }
+  return followers
+}
+
+// The followers take the logged set's weight while it is a valid one; a half-typed or cleared value moves nothing.
+export function moveFollowers<T extends { clientId?: string; weight: string; done: boolean }>(sets: T[], index: number, followers: readonly string[]): T[] {
+  const logged = sets[index]
+  const weight = Number.parseFloat(logged?.weight ?? '')
+  if (!followers.length || !logged?.done || !(weight > 0)) return sets
+  return sets.map((set) => (set.clientId && followers.includes(set.clientId) && !set.done ? { ...set, weight: String(weight) } : set))
 }
 
 export interface NextSessionExercise {

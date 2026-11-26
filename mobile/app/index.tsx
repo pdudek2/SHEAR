@@ -51,7 +51,7 @@ import {
   storedValueToSetInput,
 } from '../src/setInput'
 import { getAuthErrorMessage } from '../../src/shared/authErrors'
-import { bestSet, EQUIPMENT_LABELS, removeSetMessage, exerciseTargetLabel, focusExerciseIndex, formatPreviousSet, nextGroupMember, panelSetIndex, reconcileRest, restAfterSet, roundRows, sessionBlocks, setPairLabel, type RestCheck, setPanelRestLabel, setPanelStatus, upNextQueue, WORKOUT_LABELS } from '../../src/shared/workoutDisplay'
+import { bestSet, EQUIPMENT_LABELS, removeSetMessage, exerciseTargetLabel, focusExerciseIndex, formatPreviousSet, nextGroupMember, panelSetIndex, reconcileRest, restAfterSet, resumedRest, roundRows, sessionBlocks, setPairLabel, type RestCheck, setPanelRestLabel, setPanelStatus, upNextQueue, WORKOUT_LABELS } from '../../src/shared/workoutDisplay'
 import { catalogueMeta, sessionRoles } from '../../src/shared/nextSessionRecommendation'
 import { groupRestSec } from '../../src/shared/compression'
 import { planCut } from '../../src/shared/sessionCut'
@@ -1057,15 +1057,21 @@ function SessionScreen({ user }: { user: AuthUser }) {
     return () => back.remove()
   }, [isFocused, liveSessionId, router])
   const panelVisible = panelExercise && !sessionLocked
+  // A set or exercise added after the session's last open set was logged brings back the rest after that set.
+  const resumeRest = () => {
+    if (!liveSession || getRest()) return
+    const resumed = resumedRest(liveSession.exercises, sessionRoles(liveSession.exercises), liveSession.compression?.shortRest === true, Date.now())
+    if (resumed) changeRest({ sessionId: liveSession.sessionId, ...resumed })
+  }
   const panelEditing: EditingActions = {
     updateSet: guardClosureInteraction(canEditCurrentSession, updateSet),
     adjustSet: guardClosureInteraction(canEditCurrentSession, adjustSet),
     applyOverload: guardClosureInteraction(canEditCurrentSession, applyOverload),
     prefillFirstSet: guardClosureInteraction(canEditCurrentSession, prefillFirstSet),
     setDone: toggleSet,
-    addSet: guardClosureInteraction(canEditCurrentSession, addSet),
+    addSet: guardClosureInteraction(canEditCurrentSession, (exerciseId: string) => { resumeRest(); addSet(exerciseId) }),
     removeSet: guardClosureInteraction(canEditCurrentSession, removeSet),
-    addExercise: guardClosureInteraction(canEditCurrentSession, addExercise, ''),
+    addExercise: guardClosureInteraction(canEditCurrentSession, (exerciseId: string, name: string, source: ExerciseSource) => { resumeRest(); return addExercise(exerciseId, name, source) }, ''),
     removeExercise: guardClosureInteraction(canEditCurrentSession, removeExercise),
   }
   const rejectedEditState = state.status === 'ready' && state.syncStatus === 'storage-error' ? state : null

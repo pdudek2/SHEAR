@@ -265,6 +265,10 @@ export default function WorkoutPage() {
     exercises: userExercises,
     retry: retryUserExercises,
   } = useUserExercises(user?.uid ?? null)
+  const loadedUserExercises = userExercisesState.status === 'success' ? userExercisesState.data : null
+  useEffect(() => {
+    if (loadedUserExercises) useWorkoutStore.getState().setExerciseMeta(new Map(loadedUserExercises.map((entry) => [`user:${entry.id}`, entry])))
+  }, [loadedUserExercises])
   const [histories, setHistories] = useState<Record<string, ProgressionSession[]>>({})
   const [sessionTemplate, setSessionTemplate] = useState<{ id: string; template: WorkoutTemplate | null } | null>(null)
   // null until today's readiness is read, so a raise never flashes before a low entry arrives.

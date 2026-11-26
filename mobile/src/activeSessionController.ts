@@ -8,6 +8,7 @@ import {
   setLabel,
   setSetDone,
   updateSetValue,
+  weightFollowers,
   applyOverload,
   prefillFirstSet,
   type SetField,
@@ -116,6 +117,8 @@ export class ActiveSessionController {
   private cachedSession: ActiveWorkout | null = null
   private draft: SessionDraft | null = null
   private conflict: SessionConflictKind | null = null
+  // The logged set whose weight is being corrected and the open sets that follow it, chosen when the correction started.
+  private weightCorrection: { setId: string; followers: string[] } | null = null
   private failed = false
   // Transient save retries ran out; the next server snapshot (the connection is back) starts one more bounded cycle.
   private retryOnReconnect = false
@@ -287,11 +290,17 @@ export class ActiveSessionController {
   }
 
   updateSet(exerciseId: string, setId: string, field: SetField, value: string): void {
-    this.mutate((session) => updateSetValue(session, exerciseId, setId, field, value))
+    this.mutate((session) => updateSetValue(session, exerciseId, setId, field, value, this.followers(session, exerciseId, setId, field)))
   }
 
   adjustSet(exerciseId: string, setId: string, field: SetField, delta: number): void {
-    this.mutate((session) => adjustSetValue(session, exerciseId, setId, field, delta))
+    this.mutate((session) => adjustSetValue(session, exerciseId, setId, field, delta, this.followers(session, exerciseId, setId, field)))
+  }
+
+  private followers(session: ActiveWorkout, exerciseId: string, setId: string, field: SetField): string[] {
+    if (field !== 'weight') return []
+    if (this.weightCorrection?.setId !== setId) this.weightCorrection = { setId, followers: weightFollowers(session, exerciseId, setId) }
+    return this.weightCorrection.followers
   }
 
   applyOverload(exerciseId: string, values: { weight?: number; reps?: number }): void {
@@ -303,6 +312,7 @@ export class ActiveSessionController {
   }
 
   setDone(exerciseId: string, setId: string, done: boolean): void {
+    this.weightCorrection = null
     this.mutate((session) => setSetDone(session, exerciseId, setId, done))
   }
 

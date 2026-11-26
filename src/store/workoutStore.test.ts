@@ -45,6 +45,44 @@ describe('workoutStore set steppers', () => {
     expect(useWorkoutStore.getState().restTimer).toBeNull()
   })
 
+  it('keeps a skipped rest skipped after a local log, and when the session arrives again', () => {
+    useWorkoutStore.setState({ active: null, restTimer: null, restChecked: null })
+    const session = {
+      sessionId: 'session-local',
+      startedAt: Date.now() - 600_000,
+      exercises: [{ exerciseId: 'squat', exerciseSource: 'global' as const, name: 'Squat', sets: [{ weight: '100', reps: '5', done: false }, { weight: '100', reps: '5', done: false }] }],
+    }
+    const store = () => useWorkoutStore.getState()
+    store().hydrateFromDoc(session)
+    store().toggleSetDone(0, 0)
+    store().startRestTimer(180)
+    store().clearRestTimer()
+    store().hydrateFromDoc(store().active!)
+    expect(store().restTimer).toBeNull()
+
+    store().clearWorkout()
+    expect(store().restChecked).toBeNull()
+  })
+
+  it('brings back the rest after the last set when a set is added to a finished session', () => {
+    useWorkoutStore.setState({ active: null, restTimer: null, restChecked: null })
+    const store = () => useWorkoutStore.getState()
+    store().startWorkout()
+    store().addExercise('squat', 'Squat', 'global')
+    store().updateSet(0, 0, 'weight', '100')
+    store().updateSet(0, 0, 'reps', '5')
+    store().toggleSetDone(0, 0)
+    const loggedAt = store().active!.exercises[0]!.sets[0]!.completedAt!
+    expect(store().restTimer).toBeNull()
+
+    store().addSet(0)
+    expect(store().restTimer).toMatchObject({ startedAt: loggedAt })
+    // With an open set already there, adding another does not start a rest the user skipped.
+    store().clearRestTimer()
+    store().addSet(0)
+    expect(store().restTimer).toBeNull()
+  })
+
   it('accumulates rapid weight adjustments from the latest store value', () => {
     const store = useWorkoutStore.getState()
     store.hydrateFromDoc({
@@ -210,28 +248,45 @@ describe('workoutStore completed set validation', () => {
     expect(useWorkoutStore.getState().active?.exercises[0]?.sets[0]?.done).toBe(false)
   })
 
-  it('corrects the open sets a mistyped logged weight was carried to', () => {
-    useWorkoutStore.getState().hydrateFromDoc({
-      sessionId: 'session-1',
+  it('corrects the open sets a mistyped logged weight was carried to, chosen once when the correction starts', () => {
+    const load = (weights: string[], done: number[] = []) => useWorkoutStore.getState().hydrateFromDoc({
+      sessionId: `session-${weights.join('-')}`,
       startedAt: 1,
       exercises: [{
         exerciseId: 'squat',
         exerciseSource: 'global',
         name: 'Squat',
-        sets: [{ weight: '90', reps: '5', done: false }, { weight: '80', reps: '5', done: false }, { weight: '80', reps: '5', done: false }],
+        sets: weights.map((weight, index) => ({ weight, reps: '5', done: done.includes(index), ...(done.includes(index) ? { completedAt: index + 1 } : {}) })),
       }],
     })
-    useWorkoutStore.getState().toggleSetDone(0, 0)
-    const weights = () => useWorkoutStore.getState().active?.exercises[0]?.sets.map((set) => set.weight)
-    expect(weights()).toEqual(['90', '90', '90'])
+    const store = () => useWorkoutStore.getState()
+    const weights = () => store().active?.exercises[0]?.sets.map((set) => set.weight)
 
-    useWorkoutStore.getState().updateSet(0, 0, 'weight', '80')
+    load(['90', '80', '80'])
+    store().toggleSetDone(0, 0)
+    expect(weights()).toEqual(['90', '90', '90'])
+    store().updateSet(0, 0, 'weight', '80')
     expect(weights()).toEqual(['80', '80', '80'])
-    useWorkoutStore.getState().adjustSet(0, 0, 'weight', 2.5)
-    expect(weights()).toEqual(['82.5', '82.5', '82.5'])
-    useWorkoutStore.getState().updateSet(0, 2, 'weight', '70')
-    useWorkoutStore.getState().updateSet(0, 0, 'weight', '80')
-    expect(weights()).toEqual(['80', '80', '70'])
+
+    // Steps that pass a deliberate value on the way do not pick it up.
+    load(['100', '97.5', '95'], [0])
+    store().adjustSet(0, 0, 'weight', -2.5)
+    store().adjustSet(0, 0, 'weight', -2.5)
+    store().adjustSet(0, 0, 'weight', -2.5)
+    expect(weights()).toEqual(['92.5', '97.5', '95'])
+
+    // Typing key by key: the followers move with each valid value, a deliberate 12 stays.
+    load(['10', '10', '12'], [0])
+    for (const typed of ['1', '12', '12.', '12.5']) store().updateSet(0, 0, 'weight', typed)
+    expect(weights()).toEqual(['12.5', '12.5', '12'])
+
+    // A logged set in between ends the followers; equal numbers follow whatever their text.
+    load(['80', '80.0', '80', '80'], [0, 2])
+    store().updateSet(0, 0, 'weight', '82.5')
+    expect(weights()).toEqual(['82.5', '82.5', '80', '80'])
+
+    // A stale index changes nothing.
+    expect(() => store().updateSet(0, 9, 'weight', '50')).not.toThrow()
   })
 
   it('allows a bodyweight set with repetitions and no weight', () => {

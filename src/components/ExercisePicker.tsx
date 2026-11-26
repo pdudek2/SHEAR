@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { Search, X } from 'lucide-react'
-import { exercises as exerciseDb, matchesExerciseQuery, searchExercises, type Category, type Exercise } from '../data/exercises'
+import { exercises as exerciseDb, rankByQuery, searchExercises, type Category, type Exercise } from '../data/exercises'
 import type { ExerciseSource } from '../store/workoutStore'
 import { EXERCISE_CATEGORY_LABELS, getEquipmentLabel } from '../lib/exerciseLabels'
 import type { RecentExercisePick } from '../shared/recentExercises'
@@ -64,8 +64,7 @@ function PickerBody({ onSelect, onClose, userExercisesState, onRetryUserExercise
   const userExercises = userExercisesState.status === 'success'
     ? userExercisesState.data
     : []
-  const userResults: SearchResult[] = userExercises
-    .filter((ex) => matchesExerciseQuery(ex, query) && (category === 'all' || ex.category === category))
+  const userResults: SearchResult[] = rankByQuery(userExercises.filter((ex) => category === 'all' || ex.category === category), query)
     .map((ex) => ({ ...ex, source: 'user' as const }))
 
   const results = [...userResults, ...globalResults]
@@ -82,7 +81,7 @@ function PickerBody({ onSelect, onClose, userExercisesState, onRetryUserExercise
 
   return (
     <BottomSheet title={title} tall onClose={onClose} initialFocusRef={touch ? undefined : searchInputRef}>
-      <label className="exercise-picker-search">
+      <div className="exercise-picker-search">
         <Search size={16} aria-hidden="true" />
         <input
           ref={searchInputRef}
@@ -105,7 +104,7 @@ function PickerBody({ onSelect, onClose, userExercisesState, onRetryUserExercise
             <X size={16} aria-hidden="true" />
           </button>
         )}
-      </label>
+      </div>
 
       <div className="exercise-picker-categories no-scrollbar" role="group" aria-label="Exercise category">
         {CATEGORIES.map((c) => (

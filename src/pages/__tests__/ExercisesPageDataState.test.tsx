@@ -21,7 +21,8 @@ vi.mock('../../store/authStore', () => {
   return { useAuthStore }
 })
 
-vi.mock('../../data/exercises', () => ({
+vi.mock('../../data/exercises', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../data/exercises')>(),
   searchExercises: vi.fn(() => [{
     id: 'squat',
     name: 'Przysiad',

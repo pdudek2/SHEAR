@@ -4,7 +4,7 @@ import test from 'node:test'
 import { displayWeightDeltaToKg, displayWeightStringToKg, kgStringToDisplayWeight } from '../../src/shared/weightUnits'
 import {
   addExercise, addSet, adjustSetValue, applyOverload, exerciseHasEnteredSets, MAX_SESSION_EXERCISES, prefillFirstSet,
-  removeExercise, removeSet, setDoneError, setLabel, setSetDone, updateSetValue,
+  removeExercise, removeSet, setDoneError, setLabel, setSetDone, updateSetValue, weightFollowers,
 } from './setMutations'
 import type { ActiveWorkout } from './session'
 
@@ -51,17 +51,19 @@ test('a set carries its completion time only while it is done', () => {
   assert.equal('completedAt' in updateSetValue(done, 'exercise-a', 'set-a', 'reps', '').exercises[0]!.sets[0]!, false)
 })
 
-test('correcting the weight of a logged set corrects the open sets the slip had carried to', () => {
+test('correcting the weight of a logged set moves the open sets chosen when the correction started', () => {
   const planned = updateSetValue(updateSetValue(workout(), 'exercise-a', 'set-b', 'weight', '80'), 'exercise-a', 'set-b', 'reps', '5')
   const slipped = setSetDone(updateSetValue(planned, 'exercise-a', 'set-a', 'weight', '90'), 'exercise-a', 'set-a', true)
   assert.equal(slipped.exercises[0]?.sets[1]?.weight, '90')
-  const corrected = updateSetValue(slipped, 'exercise-a', 'set-a', 'weight', '80')
+  const followers = weightFollowers(slipped, 'exercise-a', 'set-a')
+  assert.deepEqual(followers, ['set-b'])
+  const corrected = updateSetValue(slipped, 'exercise-a', 'set-a', 'weight', '80', followers)
   assert.deepEqual(corrected.exercises[0]?.sets.map((set) => [set.weight, set.done]), [['80', true], ['80', false]])
-  const stepped = adjustSetValue(slipped, 'exercise-a', 'set-a', 'weight', -10)
-  assert.equal(stepped.exercises[0]?.sets[1]?.weight, '80')
-  // An open set the user changed on purpose keeps its weight.
+  assert.equal(adjustSetValue(slipped, 'exercise-a', 'set-a', 'weight', -10, followers).exercises[0]?.sets[1]?.weight, '80')
+  // Half-typed or cleared values move nothing; an open set at another weight is not a follower.
+  assert.equal(updateSetValue(slipped, 'exercise-a', 'set-a', 'weight', '', followers).exercises[0]?.sets[1]?.weight, '90')
   const own = updateSetValue(slipped, 'exercise-a', 'set-b', 'weight', '95')
-  assert.equal(updateSetValue(own, 'exercise-a', 'set-a', 'weight', '80').exercises[0]?.sets[1]?.weight, '95')
+  assert.deepEqual(weightFollowers(own, 'exercise-a', 'set-a'), [])
 })
 
 test('completion enforces finalizer bounds and invalid reps unmark a set', () => {

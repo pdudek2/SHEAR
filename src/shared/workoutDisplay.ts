@@ -122,6 +122,13 @@ export function restoredRest(exercises: RestExercise[], roles: readonly Role[], 
   const totalSec = restAfterSet(exercises, latest.exerciseIndex, roles, shortRest)
   return totalSec > 0 && latest.at + totalSec * 1000 > now && latest.at <= now ? { startedAt: latest.at, totalSec } : null
 }
+export const latestLoggedAt = (exercises: RestExercise[]): number => latestLogged(exercises)?.at ?? 0
+// Adding a set or an exercise after the session's last open set was logged: that set had nothing left to rest for,
+// and now the rest after it is due, from the time it was logged.
+export function resumedRest(exercises: RestExercise[], roles: readonly Role[], shortRest: boolean, now: number): { startedAt: number; totalSec: number } | null {
+  if (!exercises.some((exercise) => exercise.sets.length) || exercises.some((exercise) => exercise.sets.some((set) => !set.done))) return null
+  return restoredRest([...exercises, { sets: [{ done: false }] }], roles, shortRest, now)
+}
 // Checks the session when its newest logged set moves forward: a cached snapshot followed by a newer one from the server,
 // or a set logged on another device, brings its rest back. Undoing a set moves it back and changes nothing, and a rest
 // this device started for that set (+30 s, Skip) stays as it is.

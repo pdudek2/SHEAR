@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { createSessionId } from '../lib/sessionIdentity'
 import { clampSetValue, isValidCompletedSet, MAX_DONE_SETS_PER_EXERCISE, MAX_SESSION_EXERCISES } from '../shared/workoutLimits'
-import { applyOverload, carryLoggedWeight, followCorrectedWeight, sessionRoles } from '../shared/nextSessionRecommendation'
-import { reconcileRest, type RestCheck } from '../shared/workoutDisplay'
+import { applyOverload, carryLoggedWeight, correctionFollowers, moveFollowers, sessionRoles } from '../shared/nextSessionRecommendation'
+import { latestLoggedAt, reconcileRest, resumedRest, type RestCheck } from '../shared/workoutDisplay'
 import type { CompressionProposal, CompressionRecord } from '../shared/compressionRecord'
 import { cutRest } from '../shared/sessionCut'
 import type { CutChoice } from '../shared/sessionCut'
@@ -50,6 +50,11 @@ interface WorkoutState {
   restTimer: RestTimerState | null
   // The newest logged set already checked for a rest to bring back, as on Android.
   restChecked: RestCheck | null
+  // The user's own exercises, so a rest brought back lasts as long as the one the page started.
+  exerciseMeta: ReadonlyMap<string, ExerciseMeta> | null
+  // The logged set whose weight is being corrected and the open sets that follow it, chosen when the correction started.
+  weightCorrection: { sessionId: string; setId: string; followers: string[] } | null
+  setExerciseMeta: (meta: ReadonlyMap<string, ExerciseMeta>) => void
   startWorkout: () => void
   hydrateFromDoc: (workout: ActiveWorkout) => void
   startRestTimer: (totalSec: number, startedAt?: number) => void
@@ -135,25 +140,56 @@ function formatAdjustedSetValue(value: number, field: 'weight' | 'reps'): string
   return String(field === 'weight' ? Math.round(value * 10_000) / 10_000 : Math.round(value))
 }
 
+// One edit of a set's weight or reps; a weight correction of a logged set moves the open sets it chose when it started.
+function editSet(s: WorkoutState, exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', edit: (set: WorkoutSet) => WorkoutSet): Partial<WorkoutState> | WorkoutState {
+  const exercise = s.active?.exercises[exerciseIndex]
+  const target = exercise?.sets[setIndex]
+  if (!s.active || !exercise || !target) return s
+  const sameCorrection = s.weightCorrection?.sessionId === s.active.sessionId && s.weightCorrection.setId === target.clientId
+  const correction = field !== 'weight' ? s.weightCorrection
+    : sameCorrection ? s.weightCorrection
+      : { sessionId: s.active.sessionId, setId: target.clientId ?? '', followers: correctionFollowers(exercise.sets, setIndex) }
+  const edited = exercise.sets.map((st, si) => {
+    if (si !== setIndex) return st
+    const next = edit(st)
+    return settleDone(next, next.done && isValidCompletedSet(next))
+  })
+  const sets = field === 'weight' ? moveFollowers(edited, setIndex, correction!.followers) : edited
+  const exercises = s.active.exercises.map((ex, i) => (i === exerciseIndex ? { ...ex, sets } : ex))
+  return { active: { ...s.active, exercises }, weightCorrection: correction }
+}
+
+// The rest a set or exercise added after the last open set brings back; a running rest stays as it is.
+function restAfterAdding(s: WorkoutState): RestTimerState | null {
+  if (!s.active || s.restTimer) return s.restTimer
+  return resumedRest(s.active.exercises, sessionRoles(s.active.exercises, s.exerciseMeta ?? undefined), s.active.compression?.shortRest === true, Date.now())
+}
+
 export const useWorkoutStore = create<WorkoutState>()((set) => ({
   active: null,
   restTimer: null,
   restChecked: null,
+  exerciseMeta: null,
+  weightCorrection: null,
 
   startWorkout: () =>
-    set({ active: { sessionId: createSessionId(), startedAt: Date.now(), templateId: null, planDayId: null, exercises: [] }, restTimer: null }),
+    set({ active: { sessionId: createSessionId(), startedAt: Date.now(), templateId: null, planDayId: null, exercises: [] }, restTimer: null, restChecked: null, weightCorrection: null }),
 
   // A reload or another device's log brings back the rest still running after the newest logged set.
   hydrateFromDoc: (workout) =>
     set((state) => {
-      const current = state.active?.sessionId === workout.sessionId && state.restTimer ? { sessionId: workout.sessionId, ...state.restTimer } : null
-      const next = reconcileRest(current, state.restChecked, workout, sessionRoles(workout.exercises), workout.compression?.shortRest === true, Date.now())
+      const active = withClientIds(workout, state.active)
+      const current = state.active?.sessionId === active.sessionId && state.restTimer ? { sessionId: active.sessionId, ...state.restTimer } : null
+      const roles = sessionRoles(active.exercises, state.exerciseMeta ?? undefined)
+      const next = reconcileRest(current, state.restChecked, active, roles, active.compression?.shortRest === true, Date.now())
       return {
-        active: withClientIds(workout, state.active),
+        active,
         restTimer: next.rest === current ? (current && state.restTimer) : next.rest && { startedAt: next.rest.startedAt, totalSec: next.rest.totalSec },
         restChecked: next.checked,
       }
     }),
+
+  setExerciseMeta: (meta) => set({ exerciseMeta: meta }),
 
   startRestTimer: (totalSec, startedAt = Date.now()) =>
     set({ restTimer: { startedAt, totalSec } }),
@@ -165,7 +201,14 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
         : null,
     })),
 
-  clearRestTimer: () => set({ restTimer: null }),
+  // A skipped rest stays skipped when the same session arrives again.
+  clearRestTimer: () =>
+    set((state) => ({
+      restTimer: null,
+      restChecked: state.active
+        ? { sessionId: state.active.sessionId, at: Math.max(latestLoggedAt(state.active.exercises), state.restChecked?.sessionId === state.active.sessionId ? state.restChecked.at : 0) }
+        : state.restChecked,
+    })),
 
   setLabel: (label) =>
     set((s) => s.active ? { active: { ...s.active, label } } : s),
@@ -178,6 +221,7 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
           ...s.active,
           exercises: [...s.active.exercises, { clientId: createClientId('exercise'), exerciseId, exerciseSource: source, name, sets: [emptySet()] }],
         },
+        restTimer: restAfterAdding(s),
       }
     }),
 
@@ -192,7 +236,7 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
           : emptySet()
         return { ...ex, sets: [...ex.sets, newSet] }
       })
-      return { active: { ...s.active, exercises } }
+      return { active: { ...s.active, exercises }, restTimer: exerciseIndex < s.active.exercises.length ? restAfterAdding(s) : s.restTimer }
     }),
 
   removeSet: (exerciseIndex, setIndex) =>
@@ -207,22 +251,7 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
     }),
 
   updateSet: (exerciseIndex, setIndex, field, value) =>
-    set((s) => {
-      if (!s.active) return s
-      const exercises = s.active.exercises.map((ex, i) =>
-        i === exerciseIndex
-          ? {
-              ...ex,
-              sets: followCorrectedWeight(ex.sets.map((st, si) => {
-                if (si !== setIndex) return st
-                const next = { ...st, [field]: value }
-                return settleDone(next, next.done && isValidCompletedSet(next))
-              }), setIndex, ex.sets[setIndex]!),
-            }
-          : ex
-      )
-      return { active: { ...s.active, exercises } }
-    }),
+    set((s) => editSet(s, exerciseIndex, setIndex, field, (st) => ({ ...st, [field]: value }))),
 
   applyOverload: (exerciseIndex, values) =>
     set((s) => {
@@ -234,23 +263,9 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
     }),
 
   adjustSet: (exerciseIndex, setIndex, field, delta) =>
-    set((s) => {
-      if (!s.active) return s
-      const exercises = s.active.exercises.map((ex, i) =>
-        i === exerciseIndex
-          ? {
-              ...ex,
-              sets: followCorrectedWeight(ex.sets.map((st, si) => {
-                if (si !== setIndex) return st
-                const current = parseSetNumber(st[field], field)
-                const next = { ...st, [field]: formatAdjustedSetValue(clampSetValue(current + delta, field), field) }
-                return settleDone(next, next.done && isValidCompletedSet(next))
-              }), setIndex, ex.sets[setIndex]!),
-            }
-          : ex
-      )
-      return { active: { ...s.active, exercises } }
-    }),
+    set((s) => editSet(s, exerciseIndex, setIndex, field, (st) => (
+      { ...st, [field]: formatAdjustedSetValue(clampSetValue(parseSetNumber(st[field], field) + delta, field), field) }
+    ))),
 
   toggleSetDone: (exerciseIndex, setIndex) =>
     set((s) => {
@@ -266,7 +281,13 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
         })
         return { ...ex, sets: wasDone || !sets[setIndex] ? sets : carryLoggedWeight(sets, sets[setIndex]) }
       })
-      return { active: { ...s.active, exercises } }
+      // The check follows the sets logged here as reconcileRest would, so the next snapshot does not restore their rest.
+      const toggled = exercises[exerciseIndex]?.sets[setIndex]
+      const checked = s.restChecked?.sessionId === s.active.sessionId ? s.restChecked.at : null
+      const at = toggled?.done && toggled.completedAt !== undefined
+        ? toggled.completedAt
+        : Math.min(latestLoggedAt(exercises), checked ?? Infinity)
+      return { active: { ...s.active, exercises }, restChecked: { sessionId: s.active.sessionId, at }, weightCorrection: null }
     }),
 
   removeExercise: (exerciseIndex) =>
@@ -282,5 +303,5 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
 
   cutRest: (choice, now, userExercises) => set((s) => (s.active ? { active: cutRest(s.active, choice, now, userExercises) } : s)),
 
-  clearWorkout: () => set({ active: null, restTimer: null }),
+  clearWorkout: () => set({ active: null, restTimer: null, restChecked: null, weightCorrection: null }),
 }))

@@ -8491,8 +8491,9 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
 }
 
 .paste-plan-manual {
-  margin-top: 0.35rem;
-  padding: 0.5rem 0;
+  min-height: 2.75rem;
+  margin-top: 0.15rem;
+  padding: 0;
   color: var(--text);
   font-weight: 600;
   text-decoration: underline;
@@ -9092,7 +9093,7 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
   outline: none;
 }
 
-.exercise-picker-search:focus-within {
+.exercise-picker-search:has(input:focus) {
   outline: 2px solid var(--accent-text);
   outline-offset: 1px;
 }
@@ -9104,7 +9105,12 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
   width: 2.75rem;
   height: 2.625rem;
   margin-right: -0.75rem;
+  border-radius: 0.75rem;
   color: var(--muted);
+}
+
+.exercise-picker-clear:focus-visible {
+  outline-offset: -2px;
 }
 
 .exercise-picker-categories {

@@ -112,13 +112,30 @@ export function normalizeExerciseName(value: string): string {
     .replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
-// Every word of the query appears in the name, an alias, a muscle or the category: "biceps curl" finds the curls.
-export function matchesExerciseQuery(exercise: { name: string; aliases?: readonly string[]; muscles?: readonly string[]; category?: string }, query: string): boolean {
+type Searchable = { name: string; aliases?: readonly string[]; muscles?: readonly string[]; category?: string; equipment?: string }
+
+// 0 when the name or an alias holds every word of the query, 1 when the muscles, category or equipment complete it
+// ("biceps curl", "barbell squat"), null when a word is missing. A query of other scripts ("жим") is read as typed.
+export function exerciseQueryRank(exercise: Searchable, query: string): 0 | 1 | null {
   const words = normalizeExerciseName(query).split(' ').filter(Boolean)
-  const text = [exercise.name, ...(exercise.aliases ?? []), ...(exercise.muscles ?? []), exercise.category ?? ''].map(normalizeExerciseName).join(' | ')
-  return words.every((word) => text.includes(word))
+  if (!words.length) return !query.trim() || exercise.name.toLowerCase().includes(query.trim().toLowerCase()) ? 0 : null
+  const names = [exercise.name, ...(exercise.aliases ?? [])].map(normalizeExerciseName)
+  if (names.some((name) => words.every((word) => name.includes(word)))) return 0
+  const text = [...names, ...[...(exercise.muscles ?? []), exercise.category ?? '', exercise.equipment ?? ''].map(normalizeExerciseName)].join(' | ')
+  return words.every((word) => text.includes(word)) ? 1 : null
+}
+
+export const matchesExerciseQuery = (exercise: Searchable, query: string): boolean => exerciseQueryRank(exercise, query) !== null
+
+// Matching exercises with the ones named by the query first, each group in its own order.
+export function rankByQuery<T extends Searchable>(list: T[], query: string): T[] {
+  const ranked = list.flatMap((exercise) => {
+    const rank = exerciseQueryRank(exercise, query)
+    return rank === null ? [] : [{ exercise, rank }]
+  })
+  return ranked.filter(({ rank }) => rank === 0).concat(ranked.filter(({ rank }) => rank === 1)).map(({ exercise }) => exercise)
 }
 
 export function searchExercises(query: string, category?: Category): Exercise[] {
-  return exercises.filter((exercise) => (category ? exercise.category === category : true) && matchesExerciseQuery(exercise, query))
+  return rankByQuery(category ? exercises.filter((exercise) => exercise.category === category) : exercises, query)
 }

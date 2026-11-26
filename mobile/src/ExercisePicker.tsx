@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 
-import { exercises as exerciseDb, matchesExerciseQuery, searchExercises, type Category } from '../../data/exercises'
+import { exercises as exerciseDb, rankByQuery, searchExercises, type Category } from '../../data/exercises'
 import { EXERCISE_CATEGORY_LABELS, getEquipmentLabel } from '../../src/lib/exerciseLabels'
 import type { RecentExercisePick } from '../../src/shared/recentExercises'
 import type { ExerciseRef } from '../../src/shared/exerciseMatch'
@@ -33,11 +33,11 @@ export default function ExercisePicker({ userExercises, recent = [], suggestions
   const insets = useSafeAreaInsets()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<Category | 'all'>('all')
+  const list = useRef<FlatList<PickerResult>>(null)
   const filtered = query.trim() !== '' || category !== 'all'
   // Matches web ordering: the user's own exercises first, then the shared library.
   const results: PickerResult[] = [
-    ...(userExercises.status === 'ready' ? userExercises.data : [])
-      .filter((exercise) => matchesExerciseQuery(exercise, query) && (category === 'all' || exercise.category === category))
+    ...rankByQuery((userExercises.status === 'ready' ? userExercises.data : []).filter((exercise) => category === 'all' || exercise.category === category), query)
       .map((exercise) => ({ ...exercise, source: 'user' as const })),
     ...searchExercises(query, category === 'all' ? undefined : category).map((exercise) => ({ ...exercise, source: 'global' as const })),
   ]
@@ -72,11 +72,12 @@ export default function ExercisePicker({ userExercises, recent = [], suggestions
       <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={styles.pickerCategoriesBar} contentContainerStyle={styles.pickerCategories}
         accessibilityLabel="Exercise category">
         {PICKER_CATEGORIES.map(({ value, label }) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: category === value }}
-          onPress={() => setCategory(value)} style={({ pressed }) => [styles.pickerCategory, category === value && styles.pickerCategoryActive, pressed && styles.pickerPressed]}>
+          onPress={() => { setCategory(value); list.current?.scrollToOffset({ offset: 0, animated: false }) }} style={({ pressed }) => [styles.pickerCategory, category === value && styles.pickerCategoryActive, pressed && styles.pickerPressed]}>
           <Text style={[styles.pickerCategoryText, category === value && styles.pickerCategoryTextActive]}>{label}</Text>
         </Pressable>)}
       </ScrollView>
       <FlatList
+        ref={list}
         style={styles.flex}
         data={results}
         keyExtractor={(item) => `${item.source}-${item.id}`}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import fixture from '../__fixtures__/notionUpperLower.json'
 import foreignPlans from '../__fixtures__/foreignPlans.json'
-import { exercises, normalizeExerciseName, searchExercises } from '../../../data/exercises'
+import { exercises, matchesExerciseQuery, normalizeExerciseName, searchExercises } from '../../../data/exercises'
 import { matchExerciseName } from '../exerciseMatch'
 import { parsePlanText, planToText, resolvedPlan, type PlanTextInput } from '../planText'
 import { STARTER_PLAN_TEXT } from '../starterPlan'
@@ -181,6 +181,34 @@ describe('parsePlanText: days, title and skipped lines', () => {
       .toEqual([['Upper', ['Bench press', 'Out odwodziciel']], ['Day 2', ['Squat']]])
     expect(parsePlanText('Squat\nDeadlift').days).toEqual([expect.objectContaining({ name: 'Day 1', exercises: [expect.objectContaining({ name: 'Squat' }), expect.objectContaining({ name: 'Deadlift' })] })])
     expect(parsePlanText('Monday\nTuesday\nRest').days).toEqual([])
+  })
+
+  it('keeps the days of a names-only split, with or without blank lines and headings', () => {
+    const days = (text: string) => parsePlanText(text).days.map((day) => [day.name, day.exercises.map((exercise) => [exercise.name, exercise.match.status])])
+    // The paste sheet's own example without its numbers.
+    expect(days('Upper\nBench press\nPull-up\n\nLower\nSquat')).toEqual([
+      ['Upper', [['Bench press', 'matched'], ['Pull-up', 'matched']]], ['Lower', [['Squat', 'matched']]],
+    ])
+    const ppl = [['Push', [['Bench press', 'matched'], ['Overhead press', 'matched']]], ['Pull', [['Pull-up', 'matched'], ['Barbell row', 'matched']]], ['Legs', [['Squat', 'matched']]]]
+    expect(days('Push\nBench press\nOverhead press\n\nPull\nPull-up\nBarbell row\n\nLegs\nSquat')).toEqual(ppl)
+    expect(days('Push\nBench press\nOverhead press\nPull\nPull-up\nBarbell row\nLegs\nSquat')).toEqual(ppl)
+    expect(days('## Push\nBench press\n## Pull\nPull-up')).toEqual([['Push', [['Bench press', 'matched']]], ['Pull', [['Pull-up', 'matched']]]])
+    expect(days('Chest\nBench press\nBack\nPull-up\nLegs\nSquat').map(([name]) => name)).toEqual(['Chest', 'Back', 'Legs'])
+    expect(days('Upper:\nBench press\nLower:\nSquat')).toEqual([['Upper', [['Bench press', 'matched']]], ['Lower', [['Squat', 'matched']]]])
+    // A typo is only a suggestion, and an exact exercise name is never a calendar day.
+    const typo = parsePlanText('Day 1\nSquat\nPower').days[0]!.exercises[1]!
+    expect([typo.name, typo.match.status]).toEqual(['Power', 'unknown'])
+    expect(days('Day 1\nSquat\ndzień dobry')).toEqual([['Day 1', [['Squat', 'matched'], ['dzień dobry', 'matched']]]])
+    expect(days('Day 1\nLeg curls\nSquat')).toEqual([['Day 1', [['Leg curls', 'matched'], ['Squat', 'matched']]]])
+  })
+
+  it('reads a names-only list only when no line with numbers was rejected, and caps a day', () => {
+    expect(parsePlanText('Squat (Barbell)\nW: 60 kg x 10').days).toEqual([])
+    expect(parsePlanText('Squat\nBench press 3x5 5000 kg').days).toEqual([])
+    const names = exercises.slice(0, 22).map((exercise) => exercise.name)
+    const capped = parsePlanText(names.join('\n'))
+    expect(capped.days[0]!.exercises).toHaveLength(20)
+    expect(capped.skipped.map(({ line, reason }) => [line, reason])).toEqual([[21, 'tooManyExercises'], [22, 'tooManyExercises']])
   })
 
   it('puts every line somewhere: a day, an exercise or a skipped line with a reason', () => {
@@ -425,6 +453,13 @@ describe('catalogue', () => {
     expect(curls).toContain('barbell-curl')
     expect(curls.every((id) => exercises.find((exercise) => exercise.id === id)!.muscles.includes('biceps'))).toBe(true)
     expect(searchExercises('curl', 'arms').length).toBeGreaterThan(0)
+    // Exercises named by every word come first; muscles, category and equipment only complete a query.
+    const shoulder = searchExercises('shoulder press').map((exercise) => exercise.name)
+    expect(shoulder.slice(0, 2).every((name) => /shoulder press/i.test(name))).toBe(true)
+    expect(searchExercises('tricep')[0]!.name).toMatch(/tricep/i)
+    expect(searchExercises('barbell squat').map((exercise) => exercise.id)).toContain('squat')
+    expect(matchesExerciseQuery({ name: 'Жим лёжа' }, 'жим')).toBe(true)
+    expect(matchesExerciseQuery({ name: 'Plank' }, 'жим')).toBe(false)
   })
 })
 
