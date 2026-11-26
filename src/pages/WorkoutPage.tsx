@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -218,15 +218,28 @@ export default function WorkoutPage() {
     const stored = user ? readWorkoutClosureIntent(user.uid) : null
     return stored?.action === 'finish' && stored.sessionRevision ? stored : null
   })
-  const recoveryTriedRef = useRef(false)
-  const retryRecoveredFinish = useEffectEvent(() => { void retryClosure() })
+  const [recoveryTried, setRecoveryTried] = useState(false)
+  // Until that one attempt has run, the "could not confirm" alert would only flash and take focus.
+  const recoveryPending = !recoveryTried && closureState === 'closure_unconfirmed' && recoveredFinish !== null
+    && closureIntent?.action === 'finish' && closureIntent.session.sessionId === recoveredFinish.session.sessionId
+    && closureIntent.sessionRevision === recoveredFinish.sessionRevision
+  const recoveryClaimedRef = useRef(false)
+  const retryRecoveredFinish = useEffectEvent(() => {
+    if (recoveryClaimedRef.current) return
+    recoveryClaimedRef.current = true
+    setRecoveryTried(true)
+    void retryClosure()
+  })
   useEffect(() => {
-    if (!ready || recoveryTriedRef.current || !recoveredFinish || closureState !== 'closure_unconfirmed') return
-    if (closureIntent?.action !== 'finish' || closureIntent.session.sessionId !== recoveredFinish.session.sessionId
-      || closureIntent.sessionRevision !== recoveredFinish.sessionRevision) return
-    recoveryTriedRef.current = true
-    retryRecoveredFinish()
-  }, [closureIntent, closureState, ready, recoveredFinish])
+    if (ready && recoveryPending) retryRecoveredFinish()
+  }, [ready, recoveryPending])
+  // A closure answer that arrives after the user left this page must not pull them back; a layout cleanup runs
+  // in the commit that removes the page, before an answer can land.
+  const mountedRef = useRef(false)
+  useLayoutEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
   const [showPicker, setShowPicker] = useState(false)
   const [closureRejection, setClosureRejection] = useState<string | null>(null)
   const addExerciseRef = useRef<HTMLButtonElement>(null)
@@ -523,6 +536,7 @@ export default function WorkoutPage() {
         markClosureUnconfirmed()
         return
       }
+      if (!mountedRef.current) return
       navigate(`/workout/${encodeURIComponent(result.workoutId)}`, {
         replace: true,
         state: {
@@ -642,7 +656,7 @@ export default function WorkoutPage() {
         markClosureUnconfirmed()
         return
       }
-      navigate('/dashboard', { replace: true })
+      if (mountedRef.current) navigate('/dashboard', { replace: true })
     } catch (error) {
       console.error('[discard workout closure error]', error)
       await handleClosureError(error)
@@ -712,7 +726,7 @@ export default function WorkoutPage() {
         markClosureUnconfirmed()
         return
       }
-      navigate('/dashboard', { replace: true })
+      if (mountedRef.current) navigate('/dashboard', { replace: true })
     } catch (error) {
       console.error('[retry discard closure error]', error)
       await handleClosureError(error)
@@ -1022,7 +1036,7 @@ export default function WorkoutPage() {
           </button>
         </div>
       )}
-      {closureState === 'closure_unconfirmed' && (
+      {closureState === 'closure_unconfirmed' && !recoveryPending && (
         <div className="surface-panel mb-4 rounded-[var(--radius-xl)] border p-4" role="alert" ref={revealClosureAlert} tabIndex={-1} style={{ borderColor: 'var(--danger)' }}>
           <p className="text-sm font-semibold text-white">Could not confirm session closure.</p>
           <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>

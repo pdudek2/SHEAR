@@ -400,6 +400,16 @@ export default function TemplateEditorPage() {
       toast.error('Plan name must contain at least 2 characters.')
       return
     }
+    // A pasted plan or a draft can bring names longer than the fields let anyone type, and the server refuses them.
+    if (trimmedName.length > 120) {
+      toast.error('Shorten the plan name to 120 characters.')
+      return
+    }
+    const longDay = days.findIndex((day) => day.name.trim().length > 80)
+    if (longDay >= 0) {
+      toast.error(`Shorten the name of day ${longDay + 1} to 80 characters.`)
+      return
+    }
 
     if (days.every((day) => day.exercises.length === 0)) {
       toast.error('Add at least one exercise to the plan.')

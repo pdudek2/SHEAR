@@ -2,8 +2,10 @@ import { createElement, type ReactNode } from 'react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { toast } from 'sonner'
 import TemplateEditorPage from '../TemplateEditorPage'
 import { importPlanText } from '../../shared/planImport'
+import { saveTemplateDraft } from '../../lib/templateDraftStorage'
 
 const mocks = vi.hoisted(() => ({
   createTemplate: vi.fn(),
@@ -117,5 +119,20 @@ describe('TemplateEditorPage with a pasted plan', () => {
       { exerciseId: 'own-1', exerciseSource: 'user', name: 'Out odwodziciel', sets: 3, targetReps: 15, targetWeight: 55 },
     ])
     expect(mocks.createUserExercise).toHaveBeenCalledWith('user-1', expect.objectContaining({ name: 'Out odwodziciel' }))
+  })
+
+  it.each([
+    ['plan', 'P'.repeat(121), 'Upper', 'Shorten the plan name to 120 characters.'],
+    ['day', 'Upper / Lower', 'D'.repeat(81), 'Shorten the name of day 1 to 80 characters.'],
+  ])('a Coach draft whose %s name is longer than the server takes is stopped before saving', async (_field, plan, day, message) => {
+    // Pasted text is cut to length by the parser; a Coach draft is not
+    saveTemplateDraft({ name: plan, days: [{ name: day, exercises: [
+      { exerciseId: 'squat', exerciseSource: 'global', name: 'Squat', sets: 4, targetReps: 6, targetWeight: 90 },
+    ] }] })
+    const router = createMemoryRouter([{ path: '/templates/new', element: <TemplateEditorPage /> }], { initialEntries: ['/templates/new?draft=ai'] })
+    render(<RouterProvider router={router} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Save plan' }))
+    expect(toast.error).toHaveBeenCalledWith(message)
+    expect(mocks.createTemplate).not.toHaveBeenCalled()
   })
 })
