@@ -42,8 +42,6 @@ export function TrainTime({ today, plannedSets, budgetMin, straight, fullSets, o
   const shorter = TIME_BUDGETS.filter((budget) => budget < usual)
   const kept = compression.sets.reduce((sum, sets) => sum + sets, 0)
   const grouped = compression.blocks.some((block) => block.group && block.items.filter((item) => item.sets > 0).length > 1)
-  // After a break the start weights stay the usual day's and the session's first set tests them.
-  const weights = today.breakDays !== null && today.exercises.some((exercise) => exercise.trial) ? 'First set is a test' : 'Same weights'
   return <>
     {today.breakDays !== null && <Text style={styles.todayLine}>{today.breakDays} days since your last workout{fullSets ? '' : ' · fewer sets today'}</Text>}
     {(shorter.length > 0 || budgetMin !== null) && <View accessibilityRole="radiogroup" accessibilityLabel="Time today" style={styles.time}>
@@ -56,7 +54,7 @@ export function TrainTime({ today, plannedSets, budgetMin, straight, fullSets, o
     </View>}
     {budgetMin !== null && !compression.fits
       ? <Text accessibilityLiveRegion="polite" style={styles.todayLine}><Text style={styles.todayStrong}>Doesn’t fit in {budgetMin} min.</Text> The shortest version takes {approx}{minutes(compression.estimateSec)} min.</Text>
-      : today.record ? <Text style={styles.todayLine}><Text style={styles.todayStrong}>{approx}{minutes(compression.estimateSec)} min</Text> · {kept} of {plannedSets} sets · {today.tone === 'low' && !fullSets ? 'rough day' : weights}</Text>
+      : today.record ? <Text style={styles.todayLine}><Text style={styles.todayStrong}>{approx}{minutes(compression.estimateSec)} min</Text> · {kept} of {plannedSets} sets · {today.tone === 'low' && !fullSets ? 'rough day' : 'Same weights'}</Text>
         : <Text style={styles.todayLine}><Text style={styles.todayStrong}>{approx}{usual} min</Text> · {plannedSets} sets · plan as written</Text>}
     {today.breakDays !== null && today.tone !== 'low' && <Pressable accessibilityRole="switch" accessibilityState={{ checked: fullSets }} accessibilityLabel="Full sets" onPress={() => onFullSets(!fullSets)} style={styles.switchRow}>
       <Text style={styles.switchText}>Full sets</Text>

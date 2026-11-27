@@ -168,6 +168,15 @@ describe('sessionHint', () => {
     expect(sessionHint(trial, sets(['60', '8', true], ['60', '8', false]), 'kg')).toBeNull()
   })
 
+  it('says nothing about a trial that keeps the weight or has none, until there is a weight to apply', () => {
+    const kept = run([session(15, sets3(100, 8))])
+    expect(sessionHint(kept, sets(['100', '8', false]), 'kg')).toBeNull()
+    expect(sessionHint(kept, sets(['20', '10', true], ['100', '8', false]), 'kg')).toBeNull()
+    expect(sessionHint(kept, sets(['90', '8', false]), 'kg')).toEqual({ label: 'Long break: first set is a test', weight: 100 })
+    const unknown = run([session(120, sets3(100, 8))])
+    expect(sessionHint(unknown, sets(['', '8', false]), 'kg')).toBeNull()
+  })
+
   it('proposes the weight for the rest from the first set of an exercise new to the plan', () => {
     const fresh = run([], { target: { reps: 8, sets: 3, weight: 0 } })
     expect(sessionHint(fresh, sets(['', '8', false], ['', '8', false]), 'kg')).toBeNull()

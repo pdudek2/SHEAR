@@ -266,6 +266,32 @@ describe('useActiveSession snapshot authority', () => {
     expect(saveActiveSession.mock.calls[0][2]).toBe('revision-initial')
   })
 
+  it('sends an edit whose save failed offline again when the browser is back online, and only then', async () => {
+    vi.useFakeTimers()
+    saveActiveSession.mockRejectedValueOnce(new Error('offline'))
+    renderHook(() => useActiveSession('user-1'))
+    act(() => listener.current?.({
+      session: editableRemoteSession, sessionRevision: 'revision-initial', fromCache: false, hasPendingWrites: false,
+    }))
+    act(() => useWorkoutStore.getState().updateSet(0, 0, 'reps', '7'))
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    expect(saveActiveSession).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      window.dispatchEvent(new Event('online'))
+      await Promise.resolve()
+    })
+    expect(saveActiveSession).toHaveBeenCalledTimes(2)
+    expect(saveActiveSession.mock.calls[1][1].exercises[0].sets[0].reps).toBe('7')
+    expect(saveActiveSession.mock.calls[1][2]).toBe('revision-initial')
+
+    await act(async () => {
+      window.dispatchEvent(new Event('online'))
+      await Promise.resolve()
+    })
+    expect(saveActiveSession).toHaveBeenCalledTimes(2)
+  })
+
   it('waits for the server before editing a copy whose revision it does not know', async () => {
     vi.useFakeTimers()
     // Dashboard sync or a plan launch hydrated this copy; the backup belongs to an earlier session.
