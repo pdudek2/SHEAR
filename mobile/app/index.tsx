@@ -51,7 +51,7 @@ import {
   storedValueToSetInput,
 } from '../src/setInput'
 import { getAuthErrorMessage } from '../../src/shared/authErrors'
-import { bestSet, EQUIPMENT_LABELS, removeSetMessage, exerciseTargetLabel, focusExerciseIndex, formatPreviousSet, nextGroupMember, latestLoggedAt, panelSetIndex, reconcileRest, restAfterSet, resumedRest, roundRows, sessionBlocks, setPairLabel, type RestCheck, setPanelRestLabel, setPanelStatus, upNextQueue, WORKOUT_LABELS } from '../../src/shared/workoutDisplay'
+import { bestSet, EQUIPMENT_LABELS, removeSetMessage, exerciseTargetLabel, focusExerciseIndex, formatPreviousSet, nextGroupMember, latestLoggedAt, panelSetIndex, reconcileRest, restAfterSet, resumedRest, roundRows, sessionBlocks, setPairLabel, setPairSpokenLabel, type RestCheck, setPanelRestLabel, setPanelStatus, upNextQueue, WORKOUT_LABELS } from '../../src/shared/workoutDisplay'
 import { catalogueMeta, sessionRoles } from '../../src/shared/nextSessionRecommendation'
 import { groupRestSec } from '../../src/shared/compression'
 import { planCut } from '../../src/shared/sessionCut'
@@ -282,17 +282,19 @@ function TimeLine({ session, onOpen }: { session: ActiveWorkout; onOpen: () => v
 }
 
 
-function SetValueInput({ value, units, field, label, rejectedEdit, inputRef, onChange }: {
+function SetValueInput({ value, units, field, label, unit, rejectedEdit, inputRef, onChange }: {
   value: string
   units: Units
   field: 'weight' | 'reps'
   label: string
+  unit: string
   rejectedEdit: object | null
   inputRef?: React.Ref<TextInput>
   onChange: (value: string) => void
 }) {
   const displayed = storedValueToSetInput(value, field, units)
   const [text, setText] = useState(displayed)
+  const [typing, setTyping] = useState(false)
   const focused = useRef(false)
   const pendingSubmissions = useRef<string[]>([])
   const inputUnits = useRef(units)
@@ -310,13 +312,14 @@ function SetValueInput({ value, units, field, label, rejectedEdit, inputRef, onC
       setText(displayed)
     }
   }, [displayed, value, rejectedEdit, units])
-  return <TextInput
+  return <><TextInput
     ref={inputRef}
     accessibilityLabel={label}
     inputMode={field === 'weight' ? 'decimal' : 'numeric'}
     keyboardType={field === 'weight' ? 'decimal-pad' : 'number-pad'}
     onBlur={() => {
       focused.current = false
+      setTyping(false)
       if (pendingSubmissions.current.length === 0) setText(displayed)
     }}
     onChangeText={(next) => {
@@ -327,14 +330,17 @@ function SetValueInput({ value, units, field, label, rejectedEdit, inputRef, onC
       pendingSubmissions.current.push(canonical)
       onChange(canonical)
     }}
-    onFocus={() => { focused.current = true }}
+    onFocus={() => {
+      focused.current = true
+      setTyping(true)
+    }}
     placeholder={field === 'weight' ? '–' : '0'}
     placeholderTextColor={colors.mutedSoft}
     selectTextOnFocus
     {...fieldColors}
     style={styles.panelInput}
     value={text}
-  />
+  /><Text style={[styles.panelUnit, typing && styles.panelUnitTyping]}>{unit}</Text></>
 }
 
 interface EditingActions {
@@ -474,7 +480,7 @@ function ExerciseLedger({ history, exercise, units, metadata, target, lowReadine
             {set.done ? <SetTick draw={drawnSetId === set.clientId} />
               : <Text style={[styles.setToggle, current && styles.setToggleCurrent]}>{index + 1}</Text>}
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Edit set ${index + 1}: last ${previousText}, today ${today}`} accessibilityState={{ selected: current }}
+          <Pressable accessibilityRole="button" accessibilityLabel={`Edit set ${index + 1}: last ${previousText}, today ${setPairSpokenLabel(set, units)}`} accessibilityState={{ selected: current }}
             onPress={() => onSelectSet(set.clientId)} style={styles.setValues}>
             <Text numberOfLines={1} style={[styles.setCellMuted, styles.setValue]}>{previousText}</Text>
             <Text numberOfLines={1} style={[styles.setToday, styles.setValue, set.done && styles.setTodayDone, current && styles.setTodayCurrent]}>{today}</Text>
@@ -572,7 +578,7 @@ function GroupBlock({ uid, session, indices, currentIndex, panelSet, units, edit
             onPress={() => editing.setDone(exercise.clientId, set.clientId, !set.done)} style={[styles.setToggleColumn, styles.setTouchTarget]}>
             {set.done ? <SetTick draw={drawnSetId === set.clientId} /> : <Text style={[styles.setToggle, current && styles.setToggleCurrent]}>{label}</Text>}
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityState={{ selected: current }} accessibilityLabel={`${label}, ${exercise.name}: last ${previous}, today ${setPairLabel(set, units)}${set.done ? ', logged' : ''}`}
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: current }} accessibilityLabel={`${label}, ${exercise.name}: last ${previous}, today ${setPairSpokenLabel(set, units)}${set.done ? ', logged' : ''}`}
             onPress={() => onSelect(exercise.clientId, set.clientId)} style={styles.setValues}>
             <Text numberOfLines={1} style={[styles.setCellMuted, styles.setValue]}>{previous}</Text>
             <Text numberOfLines={1} style={[styles.setToday, styles.setValue, set.done && styles.setTodayDone, current && styles.setTodayCurrent]}>{setPairLabel(set, units)}</Text>
@@ -756,14 +762,14 @@ function SetPanel({ exercise, setIndex, member, units, rejectedEdit, editing, re
       <View style={styles.panelNum}>
         <SetStepper label="weight" step={-weightStep(units)} onStep={() => adjust('weight', displayWeightDeltaToKg(-weightStep(units), units))} />
         <View style={styles.panelValue}><SetValueInput key={`${set.clientId}:weight`} rejectedEdit={rejectedEdit} value={set.weight} units={units} field="weight" inputRef={weightRef}
-          label={`Weight, ${exercise.name}, set ${number}, ${units}`} onChange={(value) => editing.updateSet(exercise.clientId, set.clientId, 'weight', value)} /><Text style={styles.panelUnit}>{units}</Text></View>
+          label={`Weight, ${exercise.name}, set ${number}, ${units}`} unit={units} onChange={(value) => editing.updateSet(exercise.clientId, set.clientId, 'weight', value)} /></View>
         <SetStepper label="weight" step={weightStep(units)} onStep={() => adjust('weight', displayWeightDeltaToKg(weightStep(units), units))} />
       </View>
       <View style={styles.panelDivider} />
       <View style={styles.panelNum}>
         <SetStepper label="reps" step={-1} onStep={() => adjust('reps', -1)} />
         <View style={styles.panelValue}><SetValueInput key={`${set.clientId}:reps`} rejectedEdit={rejectedEdit} value={set.reps} units={units} field="reps"
-          label={`Reps, ${exercise.name}, set ${number}`} onChange={(value) => editing.updateSet(exercise.clientId, set.clientId, 'reps', value)} /><Text style={styles.panelUnit}>reps</Text></View>
+          label={`Reps, ${exercise.name}, set ${number}`} unit="reps" onChange={(value) => editing.updateSet(exercise.clientId, set.clientId, 'reps', value)} /></View>
         <SetStepper label="reps" step={1} onStep={() => adjust('reps', 1)} />
       </View>
     </View>}
@@ -1452,7 +1458,9 @@ const styles = StyleSheet.create({
   panelDivider: { backgroundColor: colors.line, height: 44, width: 1 },
   panelValue: { alignItems: 'center', flex: 1, minWidth: 0 },
   panelInput: { color: colors.textStrong, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 21, fontVariant: ['tabular-nums'], letterSpacing: -0.42, minHeight: 44, minWidth: 0, padding: 0, textAlign: 'center', width: '100%' },
-  panelUnit: { color: colors.muted, fontFamily: 'InstrumentSans_500Medium', fontSize: 12, marginTop: -10 },
+  // The hairline between value and unit marks the value as typeable; it brightens while typing.
+  panelUnit: { borderTopColor: colors.lineStrong, borderTopWidth: 1, color: colors.muted, fontFamily: 'InstrumentSans_500Medium', fontSize: 12, marginTop: -10, minWidth: 44, paddingTop: 2, textAlign: 'center' },
+  panelUnitTyping: { borderTopColor: colors.text },
   panelStep: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.09)', borderRadius: 12, boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05)', height: 52, justifyContent: 'center', width: 48 },
   panelStepText: { color: colors.text, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 13, fontVariant: ['tabular-nums'] },
   panelAction: { alignItems: 'center', backgroundColor: colors.primaryEnd, borderRadius: 15, boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35)', experimental_backgroundImage: primaryGradient, height: 52, justifyContent: 'center' },

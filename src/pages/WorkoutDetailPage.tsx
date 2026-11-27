@@ -50,6 +50,7 @@ import {
 import { getCappedWorkoutFinishedAt, hasRecordedDuration } from '../lib/sessionDuration'
 import { workoutTitle } from '../lib/workoutCopy'
 import { useProfileStore } from '../store/profileStore'
+import { useDashboardStore } from '../store/dashboardStore'
 import {
   displayWeightStringToKg,
   formatCompactVolume,
@@ -243,7 +244,8 @@ export default function WorkoutDetailPage() {
   }
   useEffect(() => {
     if (!workoutResult) return
-    navigate(location.pathname, { replace: true, state: null })
+    // The result is shown once, but the page stays Train's until the user leaves it.
+    navigate(location.pathname, { replace: true, state: { savedWorkout: true } })
   }, [location.pathname, navigate, workoutResult])
   const deleteScopeRef = useRef<object | null>(null)
   useEffect(() => {
@@ -409,9 +411,11 @@ export default function WorkoutDetailPage() {
       if (!state.workout || state.operation?.status === 'superseded') throw new ApiRejectedError('Workout changed after saving. Cancel and reopen the editor.')
       pendingEdit.current = null
       editBaseline.current = null
+      const saved = { ...workout, ...state.workout }
       setWorkoutResource((current) => current.uid === user?.uid && current.workoutId === id
-        ? { ...current, workout: { ...workout, ...state.workout } }
+        ? { ...current, workout: saved }
         : current)
+      if (user) useDashboardStore.getState().patchWorkout(user.uid, workout.id, saved)
       setEditedLabel(nextLabel ?? '')
       setEditedExercises(cloneExercises(nextExercises))
       setShowPicker(false)
@@ -448,6 +452,7 @@ export default function WorkoutDetailPage() {
         return
       }
       setTransientDeleteOperation(null)
+      useDashboardStore.getState().patchWorkout(user.uid, workoutId, null)
       leaveGuard.allowNextNavigation()
       navigate('/history', { replace: true })
       toast.success('Workout deleted')
@@ -658,15 +663,10 @@ export default function WorkoutDetailPage() {
         </motion.button>
 
         {workoutResult && !isEditing && (
-          <section className="workout-result-confirmation" aria-labelledby="workout-result-title">
-            <span className="workout-result-confirmation-icon" aria-hidden="true">
-              <Check size={18} strokeWidth={2.5} />
-            </span>
-            <div>
-              <h2 id="workout-result-title">Workout saved</h2>
-              <p>Your completed session is ready below.</p>
-            </div>
-          </section>
+          <h2 className="workout-result-saved">
+            <Check size={14} aria-hidden="true" />
+            Workout saved
+          </h2>
         )}
 
         <header className="workout-detail-session-head">
@@ -946,6 +946,12 @@ export default function WorkoutDetailPage() {
           >
             + Add exercise
           </motion.button>
+        )}
+
+        {workoutResult && !isEditing && (
+          <button type="button" className="planner-primary-action workout-result-done" onClick={handleBack}>
+            Done
+          </button>
         )}
       </div>
       <ExercisePicker

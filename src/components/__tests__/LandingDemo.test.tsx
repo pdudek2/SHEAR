@@ -15,10 +15,10 @@ describe('LandingDemo', () => {
 
     advance(1600)
     expect(ticked()).toBe(2)
-    expect(screen.getByText('Set 3 rest')).toBeInTheDocument()
+    expect(screen.getByText('Rest')).toBeInTheDocument()
 
     advance(8000 + 250)
-    expect(screen.queryByText('Set 3 rest')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rest')).not.toBeInTheDocument()
     advance(1600)
     expect(ticked()).toBe(3)
 

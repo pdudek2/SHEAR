@@ -95,7 +95,7 @@ export default function OnboardingScreen() {
           <Slider accessibilityLabel="Workouts per week" accessibilityValue={{ min: 1, max: 7, now: input.weeklyGoal }} disabled={saving}
             minimumValue={1} maximumValue={7} step={1} value={input.weeklyGoal}
             onValueChange={(value) => setInput((current) => ({ ...current, weeklyGoal: Math.round(value) }))}
-            minimumTrackTintColor={colors.accent} maximumTrackTintColor={colors.surfaceHigh} thumbTintColor={colors.text} style={styles.slider} />
+            minimumTrackTintColor={colors.accent} maximumTrackTintColor={colors.track} thumbTintColor={colors.text} style={styles.slider} />
           <View style={styles.bounds}><Text style={styles.bound}>1</Text><Text style={styles.bound}>7</Text></View>
         </View>
 

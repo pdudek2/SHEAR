@@ -18,7 +18,7 @@ import type { ExerciseMetadata } from '../src/scopedRead'
 import { TrainCoverMedia } from '../src/TrainCoverMedia'
 import { deriveWorkout } from '../src/history'
 import { latestRecord, recordLine } from '../../src/shared/workoutMoments'
-import { weekdayLabel } from '../../src/shared/week'
+import { weekdayLabel, workoutToday } from '../../src/shared/week'
 import { pluralize } from '../../src/lib/pluralize'
 import { weekCountLabel, workoutTitle } from '../../src/lib/workoutCopy'
 import { formatCompactVolume, kgStringToDisplayWeight } from '../../src/shared/weightUnits'
@@ -162,6 +162,12 @@ export default function DashboardScreen() {
   const plansPending = view.active.status === 'loading' || (canOfferStart && (templatesState.status === 'loading' || state.status === 'loading'))
   // Picking a workout means the next session matters more than the finished week.
   const weekClosed = Boolean(summary) && !plansPending && canOfferStart && !picked && (summary?.weeklyDone ?? 0) >= goal
+  // After today's workout the plan's next day is what comes next, not a second session today.
+  // A new account has no plans and no workouts: the way in matters more than Plans or an empty week.
+  // Plans still loading (or never read beside a running workout) count as none, so the two do not flash.
+  const emptyAccount = (noPlans || templatesState.status === 'loading') && recent.length === 0
+  const doneToday = !plansPending && canOfferStart && !weekClosed && chosen ? workoutToday(recent, now) : null
+  const doneTodaySets = doneToday?.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0) ?? 0
   const coverName = view.active.status === 'ready' ? workoutCover(view.active.session.label) : weekClosed ? 'week' : workoutCover(chosen?.day.name ?? chosen?.template.name)
   const record = data ? latestRecord(data.workouts, now.getTime()) : null
   const launchState = view.launch
@@ -226,7 +232,7 @@ export default function DashboardScreen() {
   }, [launchState, uid])
 
   const trainLinks = <View style={styles.links}>
-      <Pressable accessibilityRole="button" onPress={() => router.navigate('/templates')} style={styles.link}><Text style={styles.linkText}>Plans</Text></Pressable>
+      {!emptyAccount && <Pressable accessibilityRole="button" onPress={() => router.navigate('/templates')} style={styles.link}><Text style={styles.linkText}>Plans</Text></Pressable>}
       {canOfferStart && templatesState.status === 'ready' && templates.some((template) => template.days.some((day) => day.exercises.length > 0)) && <Pressable accessibilityRole="button" disabled={starting} onPress={() => { setPickerDraft(selection?.target ?? null); setPickerOpen(true) }} style={styles.link}><Text style={styles.linkText}>Change workout</Text></Pressable>}
       {canOfferStart && <Pressable accessibilityRole="button" disabled={starting || (launchState !== 'ready' && launchState !== 'unavailable')} onPress={() => startWith({ kind: 'empty' })} style={styles.link}><Text style={styles.linkText}>{noPlans ? 'Start empty workout' : 'Empty workout'}</Text></Pressable>}
     </View>
@@ -248,10 +254,11 @@ export default function DashboardScreen() {
           {!plansPending && <TrainCoverMedia key={coverName} cover={coverName} />}
           <View pointerEvents="none" style={styles.coverFade} />
           <View style={styles.coverCopy}>
-            <Text style={styles.coverMeta}>{now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+            <Text style={styles.coverMeta}>{now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}{doneToday ? ' · Up next' : ''}</Text>
             <Text accessibilityRole="header" style={styles.coverTitle}>{plansPending ? ' ' : view.active.status === 'ready' ? view.active.session.label?.trim() || 'Workout' : weekClosed ? 'Week done' : chosen?.day.name ?? `${getGreeting(now)}, ${data.profile.displayName}`}</Text>
             {plansPending ? <Text style={styles.coverMeta}> </Text> : weekClosed ? <Text style={styles.coverMeta}>{weekCountLabel(summary?.weeklyDone ?? 0, goal)} {pluralize(summary?.weeklyDone ?? 0, 'workout', 'workouts')} · {formatCompactVolume(summary?.weeklyVolume ?? 0, units)}</Text> : chosen ? <Text style={styles.coverMeta}>{chosen.template.name} · Day {(selection?.target?.dayIndex ?? 0) + 1} of {chosen.template.days.length}</Text>
               : view.active.status === 'empty' && recent[0] && <Text style={styles.coverMeta}>Last: {workoutTitle(recent[0])} · {new Date(recent[0].startedAt).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}</Text>}
+            {doneToday && <View style={styles.doneToday}><Icon name="check" size={14} color={colors.muted} /><Text style={styles.doneTodayText}>Done today: {workoutTitle(doneToday)} · {doneTodaySets} {pluralize(doneTodaySets, 'set', 'sets')}</Text></View>}
           </View>
           {record && <View pointerEvents="none" style={styles.coverSeam} />}
         </View>
@@ -279,7 +286,7 @@ export default function DashboardScreen() {
             <Text style={styles.exerciseMeta}>{exercise.sets} × {exercise.targetReps}{startWeightOf(exercise) > 0 && <> · <Text style={styles.exerciseWeight}>{kgStringToDisplayWeight(String(startWeightOf(exercise)), units)} {units}</Text></>}</Text>
             <Icon name="chevron-right" size={16} />
           </Pressable>)}
-          {canOfferStart && !chosen && !plansPending && <View style={styles.planEmpty}><Text style={styles.planEmptyTitle}>{templatesState.status === 'loading' ? 'Loading plans…' : templatesState.status === 'error' ? 'Plans unavailable' : selection?.uid === uid && selection.unavailable ? 'Workout no longer available' : templatesState.fromCache && templates.length === 0 ? 'Could not confirm saved plans' : templates.length === 0 ? 'No plans yet' : 'No workouts in your plans'}</Text><Text style={styles.planEmptyCopy}>{selection?.uid === uid && selection.unavailable ? 'Choose another workout before starting.' : noPlans ? 'Paste the plan you already follow, or start from ours.' : 'You can still start an empty workout.'}</Text></View>}
+          {canOfferStart && !chosen && !plansPending && <View style={styles.planEmpty}><Text style={styles.planEmptyTitle}>{templatesState.status === 'loading' ? 'Loading plans…' : templatesState.status === 'error' ? 'Plans unavailable' : selection?.uid === uid && selection.unavailable ? 'Workout no longer available' : templatesState.fromCache && templates.length === 0 ? 'Could not confirm saved plans' : templates.length === 0 ? 'No plans yet' : 'No workouts in your plans'}</Text><Text style={styles.planEmptyCopy}>{selection?.uid === uid && selection.unavailable ? 'Choose another workout before starting.' : noPlans ? 'Paste the plan from your notes, start from ours, or build your own.' : 'You can still start an empty workout.'}</Text></View>}
           {canOfferStart && templatesState.status === 'error' && <Pressable accessibilityRole="button" onPress={() => setTemplatesAttempt((value) => value + 1)} style={styles.retry}><Text style={styles.actionText}>Retry plans</Text></Pressable>}
           {canOfferStart && templatesState.status === 'ready' && templatesState.fromCache && <Text style={styles.planEmptyCopy}>Showing plans saved on this device. Starting requires a connection.</Text>}
         </View>
@@ -291,7 +298,7 @@ export default function DashboardScreen() {
             {launchState === 'loading' && <Text style={styles.planEmptyCopy}>Checking workout start…</Text>}
             {(launchState === 'retry' || launchState === 'unavailable' || launchState === 'corrupt') && <View accessibilityRole="alert" style={styles.launchFeedback}><Text style={styles.planEmptyCopy}>{launch?.state.message ?? 'Could not start workout.'}</Text>{launchState !== 'corrupt' && <Pressable accessibilityRole="button" onPress={() => { if (launchState === 'unavailable') { launch?.dismissUnavailable(); setSelection({ uid: uid!, target: null, unavailable: true }); setTemplatesAttempt((value) => value + 1) } else void launch?.retry() }} style={styles.retry}><Text style={styles.actionText}>Try again</Text></Pressable>}</View>}
         </View>}
-        {showSummary && summary && <View style={styles.week}>
+        {showSummary && summary && !emptyAccount && <View style={styles.week}>
           <View style={styles.weekHead}><Text accessibilityRole="header" style={styles.weekTitle}>This week</Text><Text style={styles.weekMeta}>{weekCountLabel(summary.weeklyDone, goal)}{summary.weeklyVolume > 0 ? ` · ${formatCompactVolume(summary.weeklyVolume, units)}` : ''}</Text></View>
           <View accessibilityLabel="Days of the current week" style={styles.days}>{summary.days.map((day) => <View key={day.label} style={[styles.day, day.workouts > 0 && styles.dayDone, day.isToday && styles.dayToday]}><Text style={[styles.dayLabel, (day.workouts > 0 || day.isToday) && styles.dayLabelOn]}>{day.label.charAt(0)}</Text></View>)}</View>
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: weekOpen }} onPress={() => setWeekOpen((open) => !open)} style={styles.weekLink}><Text style={styles.weekLinkText}>Week details</Text><Icon name={weekOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text} /></Pressable>
@@ -378,7 +385,7 @@ const styles = StyleSheet.create({
   coverSeam: { position: 'absolute', left: 16, right: 16, bottom: 0, height: 2.5, backgroundColor: colors.seam },
   record: { color: colors.text, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 14, marginBottom: 4 },
   coverFade: { ...StyleSheet.absoluteFill, experimental_backgroundImage: `linear-gradient(180deg, transparent 40%, ${colors.background}b8 72%, ${colors.background} 100%)` },
-  coverCopy: { position: 'absolute', left: 16, right: 16, bottom: 4 }, coverMeta: { color: colors.muted, fontFamily: 'InstrumentSans_400Regular', fontSize: 14, lineHeight: 20 },
+  coverCopy: { position: 'absolute', left: 16, right: 16, bottom: 4 }, doneToday: { alignItems: 'center', flexDirection: 'row', gap: 6, marginTop: 6 }, doneTodayText: { color: colors.text, flexShrink: 1, fontFamily: 'InstrumentSans_400Regular', fontSize: 14, lineHeight: 20 }, coverMeta: { color: colors.muted, fontFamily: 'InstrumentSans_400Regular', fontSize: 14, lineHeight: 20 },
   coverTitle: { color: colors.textStrong, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 36, lineHeight: 40, letterSpacing: -1 },
   plan: { gap: 4, marginTop: 18 }, exercise: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 48 },
   exerciseName: { flex: 1, color: colors.text, fontFamily: 'InstrumentSans_400Regular', fontSize: 15 }, exerciseMeta: { color: colors.muted, fontFamily: 'InstrumentSans_400Regular', fontSize: 14, fontVariant: ['tabular-nums'] }, exerciseWeight: { color: colors.text, fontFamily: 'InstrumentSans_500Medium' },

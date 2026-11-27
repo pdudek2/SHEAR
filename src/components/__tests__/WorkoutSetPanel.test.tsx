@@ -69,7 +69,7 @@ describe('WorkoutSetPanel', () => {
 
     expect(screen.getByText('Bench Press · editing set 1')).toBeInTheDocument()
     expect(setPanelRestLabel({ done: true }, 0)).toBe('Editing set 1')
-    expect(setPanelRestLabel({ done: false }, 1)).toBe('Set 2 rest')
+    expect(setPanelRestLabel({ done: false }, 1)).toBe('Rest')
     expect(setPanelRestLabel(null, -1)).toBe('Rest')
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Weight, Bench Press, set 1, kg' }), { target: { value: '82.5' } })
     expect(on.onUpdateSet).toHaveBeenCalledWith(1, 0, 'weight', '82.5')

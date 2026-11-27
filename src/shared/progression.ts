@@ -169,8 +169,9 @@ function signedWeight(deltaKg: number, units: WeightUnits): string {
 
 const perDumbbell = (equipment?: string) => (equipment === 'dumbbell' ? ' per dumbbell' : '')
 
-export function progressionHintLabel(progression: Progression, units: WeightUnits, equipment?: string): string {
-  if (progression.trial?.maxWeight === null) return 'First set is a test'
+// An exercise without history has nothing to say before its first set.
+export function progressionHintLabel(progression: Progression, units: WeightUnits, equipment?: string): string | null {
+  if (progression.trial?.maxWeight === null) return null
   if (progression.trial) {
     return progression.weight !== null && progression.delta < 0
       ? `Long break: first set is a test at ${signedWeight(progression.delta, units)}${perDumbbell(equipment)}`
@@ -187,7 +188,8 @@ export function trialHintLabel(weightKg: number, units: WeightUnits, equipment?:
 export interface SessionHint { label: string; weight?: number; reps?: number }
 type SessionSet = { weight: string; reps: string; done: boolean }
 
-// Shown only when it would change an open set; a trial is announced until a non-warm-up set is logged.
+// Shown only when it would change an open set; a trial after a break is announced until a non-warm-up set is logged.
+// An exercise without history says nothing until its first set gives a weight to apply.
 export function sessionHint(progression: Progression | null, sets: SessionSet[], units: WeightUnits, equipment?: string): SessionHint | null {
   const open = sets.filter((set) => !set.done)
   if (!progression || !open.length) return null
@@ -199,18 +201,16 @@ export function sessionHint(progression: Progression | null, sets: SessionSet[],
 
   if (progression.trial) {
     const done = sets.filter((set) => set.done).map((set) => ({ weight: Number.parseFloat(set.weight) || 0, reps: Number.parseInt(set.reps, 10) || 0 }))
-    if (!done.length) return progression.weight !== null && differs('weight', progression.weight) ? { label, weight: progression.weight } : { label }
+    if (!done.length) return label === null ? null : progression.weight !== null && differs('weight', progression.weight) ? { label, weight: progression.weight } : { label }
     // The heaviest logged set sets the scale, so a warm-up never counts as the test.
     const reference = progression.weight ?? Math.max(...done.map((set) => set.weight))
     const test = done.find((set) => set.weight >= reference * 0.8)
-    if (!test) return progression.ceiling > 3 ? { label } : null
+    if (!test) return progression.ceiling > 3 && label !== null ? { label } : null
     const weight = trialWeight(progression, test, units)
     if (weight === null) return null
-    if (differs('weight', weight)) return { label: trialHintLabel(weight, units, equipment), weight }
-    // Without history the open sets took the test's weight on their own; the line says where the number came from.
-    return progression.trial.maxWeight === null ? { label: trialHintLabel(weight, units, equipment) } : null
+    return differs('weight', weight) ? { label: trialHintLabel(weight, units, equipment), weight } : null
   }
-  if (progression.weight === null) return null
+  if (progression.weight === null || label === null) return null
   if (progression.change === 'weight' && differs('weight', progression.weight)) {
     return { label, weight: progression.weight, reps: progression.reps }
   }

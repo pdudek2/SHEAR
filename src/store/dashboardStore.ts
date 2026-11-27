@@ -15,6 +15,8 @@ interface DashboardState extends DashboardSnapshot {
   plans: { uid: string; templates: WorkoutTemplate[] } | null
   setSnapshot: (uid: string, snapshot: DashboardSnapshot) => boolean
   setPlans: (uid: string, templates: WorkoutTemplate[]) => void
+  // An edit or delete elsewhere replaces or drops the workout, so Train does not show it stale until its reread.
+  patchWorkout: (uid: string, workoutId: string, next: WorkoutSummary | null) => void
   clearSnapshot: () => void
 }
 
@@ -33,6 +35,11 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setPlans: (uid, templates) => {
     if (useAuthStore.getState().user?.uid === uid) set({ plans: { uid, templates } })
   },
+  patchWorkout: (uid, workoutId, next) => set((state) => state.uid !== uid ? state : {
+    workouts: next
+      ? state.workouts.map((workout) => workout.id === workoutId ? next : workout)
+      : state.workouts.filter((workout) => workout.id !== workoutId),
+  }),
   clearSnapshot: () => set({
     plans: null,
     uid: null,

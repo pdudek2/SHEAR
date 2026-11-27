@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { focusExerciseIndex, nextGroupMember, reconcileRest, restAfterSet, restoredRest, roundRows, sessionBlocks, setPairLabel, trainingSinceLabel, upNextQueue } from '../workoutDisplay'
+import { focusExerciseIndex, nextGroupMember, reconcileRest, restAfterSet, restoredRest, roundRows, sessionBlocks, setPairSpokenLabel, setPairLabel, trainingSinceLabel, upNextQueue } from '../workoutDisplay'
 import type { Role } from '../compression'
 
 it('dates training from the first workout when imported history is older than the account', () => {
@@ -84,7 +84,10 @@ describe('session flow', () => {
 
   it('shows a set with nothing entered as a dash, and any entered value as weight × reps', () => {
     expect(setPairLabel({ weight: '', reps: '' }, 'kg')).toBe('—')
-    expect(setPairLabel({ weight: '', reps: '8' }, 'kg')).toBe('0 × 8')
+    expect(setPairLabel({ weight: '', reps: '8' }, 'kg')).toBe('— × 8')
+    expect(setPairLabel({ weight: '0', reps: '8' }, 'kg')).toBe('0 × 8')
+    expect(setPairSpokenLabel({ weight: '', reps: '8' }, 'kg')).toBe('no weight × 8')
+    expect(setPairSpokenLabel({ weight: '100', reps: '5' }, 'kg')).toBe('100 × 5')
     expect(setPairLabel({ weight: '100', reps: '5' }, 'kg')).toBe('100 × 5')
   })
 

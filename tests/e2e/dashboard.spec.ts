@@ -13,7 +13,6 @@ const emulatorMode = process.env.E2E_BACKEND === 'emulator'
 async function openDashboard(page: Page) {
   await page.goto('/dashboard')
   await expectAppReady(page, '/dashboard')
-  await expect(page.getByRole('heading', { name: 'This week' })).toBeVisible({ timeout: 15_000 })
 }
 
 test.describe('Dashboard regressions', () => {
@@ -37,7 +36,12 @@ test.describe('Dashboard regressions', () => {
     }
   })
 
-  test('renders one week summary without removed weekly surfaces', async ({ page }) => {
+  test('renders one week summary without removed weekly surfaces', async ({ page, cleanup }) => {
+    test.skip(!emulatorMode, 'emulator-only deterministic fixture')
+    // A new account has no week strip, so the account gets a workout first.
+    const sessionId = 'phase-1-dashboard-week-strip'
+    cleanup.add('remove week-strip workout', () => deleteLifecycleWorkout(sessionId))
+    await seedLifecycleWorkout({ sessionId, materialized: true, label: 'Phase 1 week strip' })
     await openDashboard(page)
 
     await expect(page.locator('.dashboard-metric-strip')).toHaveCount(0)

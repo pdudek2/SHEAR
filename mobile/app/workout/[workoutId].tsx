@@ -22,6 +22,7 @@ import { colors, pageBackground } from '../../src/theme'
 import { Icon } from '../../src/icons'
 import { WorkoutSteps } from '../../src/WorkoutSteps'
 import { BottomSheet } from '../../src/BottomSheet'
+import BottomNavigation, { plateRow } from '../../src/BottomNavigation'
 
 export default function SavedWorkoutScreen() {
   const { workoutId: routeId, saved, from } = useLocalSearchParams<{ workoutId: string; saved?: string; from?: string }>()
@@ -83,7 +84,7 @@ export default function SavedWorkoutScreen() {
     <SafeAreaView edges={['top']} style={styles.screen}>
       <StatusBar style="light" />
       <HistoryHeader />
-      <ActiveWorkoutReturnBar top />
+      {!resultIsValid && <ActiveWorkoutReturnBar top />}
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.navRow}>
           <Pressable accessibilityRole="button" accessibilityLabel={resultIsValid ? 'Back to Train' : `Back to ${from === 'train' ? 'Train' : 'History'}`} onPress={back} style={styles.backButton}>
@@ -92,10 +93,7 @@ export default function SavedWorkoutScreen() {
         </View>
 
         <WorkoutDraftRecovery uid={user.uid} workoutId={workoutId} />
-        {resultIsValid && <View style={styles.resultBanner}>
-          <View accessibilityElementsHidden style={styles.resultMark}><Icon name="check" size={18} color={colors.recovery} /></View>
-          <View style={styles.resultCopy}><Text style={styles.resultTitle}>Workout saved</Text><Text style={styles.resultSubtitle}>Your completed session is ready below.</Text></View>
-        </View>}
+        {resultIsValid && <View style={styles.resultLine}><Icon name="check" size={14} color={colors.muted} /><Text style={styles.resultTitle}>Workout saved</Text></View>}
 
         {validWorkoutId && workoutRead.state.status === 'loading' && <View style={styles.feedbackRow}><ActivityIndicator color={colors.accent} /><Text style={styles.statusText}>Loading workout…</Text></View>}
         {!validWorkoutId && <View style={styles.emptyState}><Text style={styles.statusText}>Workout not found.</Text></View>}
@@ -175,6 +173,10 @@ export default function SavedWorkoutScreen() {
           </View>
         </>}
       </ScrollView>
+      {resultIsValid && <View style={[styles.doneDock, plateRow]}>
+        <Pressable accessibilityRole="button" onPress={back} style={({ pressed }) => [styles.done, pressed && styles.donePressed]}><Text style={styles.doneText}>Done</Text></Pressable>
+      </View>}
+      {resultIsValid && <BottomNavigation savedWorkout />}
       {moreOpen && <BottomSheet title={heroLabel} onClose={() => setMoreOpen(false)}>
         {(close) => <Pressable accessibilityRole="button" onPress={() => close(() => router.push({ pathname: '/workout-edit/[workoutId]', params: { workoutId, action: 'delete' } }))} style={styles.sheetRow}>
           <Text style={styles.sheetRowQuiet}>Delete workout</Text><Icon name="trash" size={16} />
@@ -203,12 +205,12 @@ const styles = StyleSheet.create({
       navRow: { alignItems: 'center', flexDirection: 'row', minHeight: 44 },
   backButton: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 5, minHeight: 44, paddingHorizontal: 1 },
   backText: { color: colors.muted, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 13 },
-  resultBanner: { alignItems: 'center', backgroundColor: 'rgba(244, 238, 232, 0.048)', borderColor: 'rgba(244, 238, 232, 0.18)', borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 12, marginBottom: 10, marginTop: 4, padding: 14 },
-  resultMark: { alignItems: 'center', backgroundColor: 'rgba(244, 238, 232, 0.078)', borderRadius: 50, height: 36, justifyContent: 'center', width: 36 },
-  check: { color: colors.accentText, fontFamily: 'InstrumentSans_700Bold', fontSize: 18 },
-  resultCopy: { flex: 1 },
-  resultTitle: { color: colors.textStrong, fontFamily: 'InstrumentSans_700Bold', fontSize: 16 },
-  resultSubtitle: { color: colors.muted, fontFamily: 'InstrumentSans_400Regular', fontSize: 12, lineHeight: 18, marginTop: 2 },
+  resultLine: { alignItems: 'center', flexDirection: 'row', gap: 6, marginBottom: 4 },
+  resultTitle: { color: colors.text, fontFamily: 'InstrumentSans_500Medium', fontSize: 14 },
+  doneDock: { paddingHorizontal: 16, paddingVertical: 10 },
+  done: { alignItems: 'center', backgroundColor: colors.primaryStart, borderRadius: 15, justifyContent: 'center', minHeight: 50 },
+  donePressed: { opacity: 0.8 },
+  doneText: { color: colors.onPrimary, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 16 },
   sessionHead: { paddingBottom: 12 },
   kicker: { color: colors.muted, fontFamily: 'InstrumentSans_400Regular', fontSize: 14, marginTop: 4 },
   workoutName: { flexShrink: 1, color: colors.textStrong, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 28, lineHeight: 31, letterSpacing: -0.67 },

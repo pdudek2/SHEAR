@@ -7,7 +7,7 @@ import type { SessionHint } from '../../shared/progression'
 import { usePreviousSets } from './sessionHelpers'
 import type { Units } from '../../lib/userProfile'
 
-import { exerciseMetrics, formatPreviousSet, setPairLabel } from '../../shared/workoutDisplay'
+import { exerciseMetrics, formatPreviousSet, setPairLabel, setPairSpokenLabel } from '../../shared/workoutDisplay'
 
 interface WorkoutExerciseLedgerItemProps {
   exerciseClientId: string
@@ -123,7 +123,7 @@ const WorkoutExerciseLedgerItem = React.memo(function WorkoutExerciseLedgerItem(
         className="workout-set-values tabular-nums"
         onClick={() => onSelectSet(setIndex)}
         aria-pressed={setIndex === panelSetIndex}
-        aria-label={`Edit set ${setIndex + 1}: last ${formatPreviousSet(previousSets[setIndex], units)}, today ${setPairLabel(set, units)}`}
+        aria-label={`Edit set ${setIndex + 1}: last ${formatPreviousSet(previousSets[setIndex], units)}, today ${setPairSpokenLabel(set, units)}`}
       >
         <span className="workout-set-previous">{formatPreviousSet(previousSets[setIndex], units)}</span>
         <span className="workout-set-today">{setPairLabel(set, units)}</span>

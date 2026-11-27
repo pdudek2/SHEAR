@@ -70,7 +70,10 @@ test.describe('Short on time mid-session', () => {
         await expect(panel).toContainText(`${letter} · ${name} · round 1 of 3`)
         await page.getByRole('button', { name: 'Log set' }).click()
       }
-      await expect(panel).toContainText('then A · Lateral Raise · round 2 of 3')
+      // The rest bar names only the rest; the round shows again once it is skipped.
+      await expect(panel).toContainText('Rest')
+      await page.getByRole('button', { name: 'Skip rest' }).click()
+      await expect(panel).toContainText('A · Lateral Raise · round 2 of 3')
       await page.getByRole('button', { name: 'Finish', exact: true }).first().click()
       await page.getByRole('button', { name: /Save \d+ sets and finish/ }).click()
       await expect.poll(async () => (await db.doc(`workouts/cut-${uid}`).get()).data()?.compression?.cut?.leftMin, { timeout: 20_000 }).toBe(15)
