@@ -1,4 +1,4 @@
-import type { Exercise } from '../../data/exercises'
+import { rankByQuery, type Exercise } from '../../data/exercises'
 import { EXERCISE_CATEGORY_LABELS, getEquipmentLabel } from '../../src/lib/exerciseLabels'
 import { parsePreviousSets } from './scopedRead'
 import { parseProgressRecord } from './progressData'
@@ -8,10 +8,8 @@ export { categories, equipmentOptions, muscleOptions, validateExerciseInput, sam
 export type { ExerciseInput } from '../../src/shared/exerciseInput'
 import { validateExerciseInput, type ExerciseInput } from '../../src/shared/exerciseInput'
 
-export function filterExercises<T extends { name: string; category: string; equipment: string }>(list: T[], search: string, category: string = 'all', equipment: string = 'all'): T[] {
-  const q = search.toLowerCase()
-  return list.filter(exercise => (!q || exercise.name.toLowerCase().includes(q))
-    && (category === 'all' || exercise.category === category) && (equipment === 'all' || exercise.equipment === equipment))
+export function filterExercises<T extends { name: string; category: string; equipment: string; aliases?: readonly string[]; muscles?: readonly string[] }>(list: T[], search: string, category: string = 'all', equipment: string = 'all'): T[] {
+  return rankByQuery(list.filter(exercise => (category === 'all' || exercise.category === category) && (equipment === 'all' || exercise.equipment === equipment)), search)
 }
 
 export function exerciseTaxonomy(exercise: Exercise): string { return `${EXERCISE_CATEGORY_LABELS[exercise.category]} · ${getEquipmentLabel(exercise.equipment)}` }

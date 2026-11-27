@@ -648,7 +648,7 @@ export default function DashboardPage() {
         type="button"
         onClick={() => navigate('/workout/new')}
         className="workout-set-panel-action"
-        aria-label="Return to workout"
+        aria-label={`Resume ${sessionLabel}`}
       >
         Resume <span>{sessionLabel}</span> · <ElapsedSessionTimer startedAt={active.startedAt} className="tabular-nums" />
       </button>

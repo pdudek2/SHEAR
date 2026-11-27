@@ -101,7 +101,7 @@ test.describe('Workout navigation guard', () => {
     await page.goto('/dashboard')
     await expectAppReady(page, '/dashboard')
     await expect(page.getByRole('region', { name: 'Active workout' })
-      .getByRole('button', { name: 'Return to workout' })).toBeVisible({ timeout: 10_000 })
+      .getByRole('button', { name: /^Resume / })).toBeVisible({ timeout: 10_000 })
 
     await page.screenshot({ path: 'test-results/guard-navigated-away.png' })
 

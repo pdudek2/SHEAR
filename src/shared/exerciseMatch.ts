@@ -9,7 +9,7 @@ export type NameMatch =
   | { status: 'generic' | 'unknown'; suggestions: ExerciseRef[] }
 
 // Muscle names say which muscle, not which exercise: these always go to the user with suggestions.
-const GENERIC_NAMES: Record<string, MuscleGroup[]> = {
+export const GENERIC_NAMES: Record<string, MuscleGroup[]> = {
   biceps: ['biceps'], bicepsy: ['biceps'], triceps: ['triceps'], tricepsy: ['triceps'],
   barki: ['shoulders'], bark: ['shoulders'], shoulders: ['shoulders'], plecy: ['back'], back: ['back'],
   klatka: ['chest'], 'klatka piersiowa': ['chest'], klata: ['chest'], chest: ['chest'],

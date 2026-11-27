@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { Search } from 'lucide-react'
-import { exercises as exerciseDb, searchExercises, type Category, type Exercise } from '../data/exercises'
+import { Search, X } from 'lucide-react'
+import { exercises as exerciseDb, rankByQuery, searchExercises, type Category, type Exercise } from '../data/exercises'
 import type { ExerciseSource } from '../store/workoutStore'
 import { EXERCISE_CATEGORY_LABELS, getEquipmentLabel } from '../lib/exerciseLabels'
 import type { RecentExercisePick } from '../shared/recentExercises'
@@ -54,6 +54,7 @@ function PickerBody({ onSelect, onClose, userExercisesState, onRetryUserExercise
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<Category | 'all'>('all')
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   // On a phone the keyboard would cover the list before anything is chosen.
   const touch = window.matchMedia?.('(hover: none)').matches
 
@@ -63,17 +64,11 @@ function PickerBody({ onSelect, onClose, userExercisesState, onRetryUserExercise
   const userExercises = userExercisesState.status === 'success'
     ? userExercisesState.data
     : []
-  const q = query.toLowerCase()
-  const userResults: SearchResult[] = userExercises
-    .filter((ex) => {
-      const matchesQuery = !q || ex.name.toLowerCase().includes(q)
-      const matchesCategory = category === 'all' || ex.category === category
-      return matchesQuery && matchesCategory
-    })
+  const userResults: SearchResult[] = rankByQuery(userExercises.filter((ex) => category === 'all' || ex.category === category), query)
     .map((ex) => ({ ...ex, source: 'user' as const }))
 
   const results = [...userResults, ...globalResults]
-  const filtered = q !== '' || category !== 'all'
+  const filtered = query.trim() !== '' || category !== 'all'
   const recentResults: SearchResult[] = filtered ? [] : recent.flatMap((pick) => {
     const exercise = (pick.source === 'user' ? userExercises : exerciseDb).find(({ id }) => id === pick.id)
     return exercise ? [{ ...exercise, name: pick.name, source: pick.source }] : []
@@ -86,7 +81,7 @@ function PickerBody({ onSelect, onClose, userExercisesState, onRetryUserExercise
 
   return (
     <BottomSheet title={title} tall onClose={onClose} initialFocusRef={touch ? undefined : searchInputRef}>
-      <label className="exercise-picker-search">
+      <div className="exercise-picker-search">
         <Search size={16} aria-hidden="true" />
         <input
           ref={searchInputRef}
@@ -96,14 +91,30 @@ function PickerBody({ onSelect, onClose, userExercisesState, onRetryUserExercise
           onChange={(e) => setQuery(e.target.value)}
           aria-label="Search exercises"
         />
-      </label>
+        {query && (
+          <button
+            type="button"
+            className="exercise-picker-clear"
+            aria-label="Clear search"
+            onClick={() => {
+              setQuery('')
+              searchInputRef.current?.focus()
+            }}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        )}
+      </div>
 
       <div className="exercise-picker-categories no-scrollbar" role="group" aria-label="Exercise category">
         {CATEGORIES.map((c) => (
           <button
             key={c.value}
             type="button"
-            onClick={() => setCategory(c.value)}
+            onClick={() => {
+              setCategory(c.value)
+              scrollRef.current?.scrollTo?.({ top: 0 })
+            }}
             aria-pressed={category === c.value}
             className="exercise-picker-category"
           >
@@ -112,7 +123,7 @@ function PickerBody({ onSelect, onClose, userExercisesState, onRetryUserExercise
         ))}
       </div>
 
-      <div className="exercise-picker-scroll">
+      <div ref={scrollRef} className="exercise-picker-scroll">
         {userExercisesState.status === 'loading' && (
           <ActionFeedback status="pending" message="Loading your exercises…" />
         )}
@@ -149,7 +160,7 @@ function PickerBody({ onSelect, onClose, userExercisesState, onRetryUserExercise
         ) : userExercisesState.status === 'success' ? (
           <div className="exercise-picker-empty">
             <strong>No results</strong>
-            <p>Change your search or choose another category.</p>
+            <p>{category === 'all' ? 'Try a shorter name, like “curl”, or clear the search.' : 'Change your search or choose All.'}</p>
           </div>
         ) : null}
       </div>

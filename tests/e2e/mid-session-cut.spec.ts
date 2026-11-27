@@ -36,7 +36,7 @@ async function openSheet(page: Page, request: APIRequestContext) {
   await db.doc(`activeSessions/${uid}`).set({ userId: uid, sessionId: `cut-${uid}`, sessionRevision: 'cut-1', startedAt, templateId: null, label: 'Upper Body', exercises, updatedAt: Date.now() })
 
   await page.goto('/dashboard')
-  await page.getByRole('button', { name: 'Return to workout' }).click()
+  await page.getByRole('button', { name: /^Resume / }).click()
   await page.getByRole('button', { name: 'Short on time?' }).click()
   const sheet = page.getByRole('dialog', { name: 'Short on time' })
   await expect(sheet.getByText(/min of work left · 12 sets/)).toBeVisible()

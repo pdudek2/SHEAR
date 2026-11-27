@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { focusExerciseIndex, nextGroupMember, reconcileRest, restAfterSet, restoredRest, roundRows, sessionBlocks, trainingSinceLabel, upNextQueue } from '../workoutDisplay'
+import { focusExerciseIndex, nextGroupMember, reconcileRest, restAfterSet, restoredRest, roundRows, sessionBlocks, setPairLabel, trainingSinceLabel, upNextQueue } from '../workoutDisplay'
 import type { Role } from '../compression'
 
 it('dates training from the first workout when imported history is older than the account', () => {
@@ -82,6 +82,12 @@ describe('session flow', () => {
     expect(sessionBlocks([exercise(0, 2), exercise(0, 2, 'g1'), exercise(0, 2), exercise(0, 2, 'g1')])).toEqual([{ kind: 'single', index: 0 }, { kind: 'group', group: 'g1', indices: [1, 3] }, { kind: 'single', index: 2 }])
   })
 
+  it('shows a set with nothing entered as a dash, and any entered value as weight × reps', () => {
+    expect(setPairLabel({ weight: '', reps: '' }, 'kg')).toBe('—')
+    expect(setPairLabel({ weight: '', reps: '8' }, 'kg')).toBe('0 × 8')
+    expect(setPairLabel({ weight: '100', reps: '5' }, 'kg')).toBe('100 × 5')
+  })
+
   it('rests by role, not after a set that leaves its round open, and by the group after a round', () => {
     const roles: Role[] = ['main', 'compound', 'isolation', 'isolation']
     const straight = [exercise(1, 4), exercise(1, 3), exercise(1, 3), exercise(0, 3)]
@@ -94,6 +100,8 @@ describe('session flow', () => {
     const withMain = [exercise(1, 2, 'g1'), exercise(1, 2, 'g1')]
     expect(restAfterSet(withMain, 1, ['main', 'compound'], true)).toBe(120)
     // The partner has no third set, so the third set rests like a straight set.
-    expect(restAfterSet([exercise(3, 3, 'g1'), exercise(2, 2, 'g1')], 0, ['isolation', 'isolation'], false)).toBe(90)
+    expect(restAfterSet([exercise(3, 3, 'g1'), exercise(2, 2, 'g1'), exercise(0, 1)], 0, ['isolation', 'isolation', 'isolation'], false)).toBe(90)
+    expect(restAfterSet([exercise(3, 3, 'g1'), exercise(2, 2, 'g1')], 0, ['isolation', 'isolation'], false)).toBe(0)
+    expect(restAfterSet([exercise(4, 4)], 0, ['main'], false)).toBe(0)
   })
 })

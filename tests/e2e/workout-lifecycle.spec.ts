@@ -93,7 +93,7 @@ test.describe('Workout lifecycle Phase 1 regressions', () => {
     await expect(returnBar).toBeVisible()
     await expect(emptyWorkoutEntry(page)).toHaveCount(0)
 
-    await returnBar.getByRole('button', { name: 'Return to workout' }).click()
+    await returnBar.getByRole('button', { name: /^Resume / }).click()
     await expectAppReady(page, '/workout/new')
     const returned = await readLifecycleActiveSession()
     expect(returned).toMatchObject({
@@ -135,7 +135,8 @@ test.describe('Workout lifecycle Phase 1 regressions', () => {
     await page.getByRole('button', { name: 'Unmark set 1 for Phase 1 Bench Press' }).click()
     await reps.fill('6')
     await page.getByRole('button', { name: 'Mark set 1 for Phase 1 Bench Press' }).click()
-    await expect(page.locator('.rest-timer-bar')).toContainText(/rest/i)
+    // The session's only set: nothing is left to rest for.
+    await expect(page.locator('.rest-timer-bar')).toHaveCount(0)
     await waitForSettledLifecycleActiveSession((session) => (
       session?.sessionId === sessionId && session.exercises[0]?.sets[0]?.reps === '6'
     ))
@@ -170,7 +171,7 @@ test.describe('Workout lifecycle Phase 1 regressions', () => {
     await expect(page).toHaveURL('/workout/new')
     await selectSet(page, 1)
     await expect(reps).toHaveValue('6')
-    await expect(page.locator('.rest-timer-bar')).toContainText('editing set 1')
+    await expect(page.getByRole('region', { name: 'Current set' })).toContainText(/editing set 1/i)
 
     expect(await readLifecycleActiveSession()).toMatchObject({
       sessionId,
@@ -187,10 +188,10 @@ test.describe('Workout lifecycle Phase 1 regressions', () => {
         await page.getByRole('button', { name: 'Back to Train' }).click()
         await expect(returnBar).toBeVisible()
         await expect(returnBar).not.toContainText(/saved|cloud/i)
-        await returnBar.getByRole('button', { name: 'Return to workout' }).click()
+        await returnBar.getByRole('button', { name: /^Resume / }).click()
         await selectSet(page, 1)
         await expect(reps).toHaveValue('7')
-        await expect(page.locator('.rest-timer-bar')).toContainText('editing set 1')
+        await expect(page.getByRole('region', { name: 'Current set' })).toContainText(/editing set 1/i)
         await setFirestoreNetworkEnabled(page, true)
       },
     )
@@ -554,7 +555,7 @@ test.describe('Workout lifecycle Phase 1 regressions', () => {
         await expect(page.getByRole('heading', { name: 'Workout saved' })).toBeVisible()
         await expect(page.getByText('Stats are waiting to sync.', { exact: true })).toBeVisible()
         await expect(page.getByRole('button', { name: 'Retry sync' })).toBeVisible()
-        await page.getByRole('button', { name: 'Back to Home' }).click()
+        await page.getByRole('button', { name: 'Back to Train' }).click()
         await expectAppReady(page, '/dashboard')
         await page.goto(`/workout/${sessionId}`)
         await expect(page.getByText('Stats are waiting to sync.', { exact: true })).toBeVisible()

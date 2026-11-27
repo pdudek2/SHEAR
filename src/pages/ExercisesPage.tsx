@@ -7,7 +7,7 @@ import { useAuthStore } from '../store/authStore'
 import { useProfileStore } from '../store/profileStore'
 import { getRecords } from '../lib/progressService'
 import { kgToDisplayWeight } from '../lib/weightUnits'
-import { exercises, type Category, type Equipment, type Exercise } from '../data/exercises'
+import { exercises, rankByQuery, type Category, type Equipment, type Exercise } from '../data/exercises'
 import {
   createUserExercise,
   deleteUserExercise,
@@ -170,18 +170,12 @@ export default function ExercisesPage() {
     setConfirmDeleteExercise(null)
   }
 
-  const q = query.toLowerCase()
-
   function matchesFilters(ex: Exercise) {
-    return (
-      (!q || ex.name.toLowerCase().includes(q)) &&
-      (category === 'all' || ex.category === category) &&
-      (equipment === 'all' || ex.equipment === equipment)
-    )
+    return (category === 'all' || ex.category === category) && (equipment === 'all' || ex.equipment === equipment)
   }
 
-  const filteredUser = userExercises.filter(matchesFilters)
-  const filteredGlobal = exercises.filter(matchesFilters)
+  const filteredUser = rankByQuery(userExercises.filter(matchesFilters), query)
+  const filteredGlobal = rankByQuery(exercises.filter(matchesFilters), query)
   const hasNoResults = filteredUser.length === 0 && filteredGlobal.length === 0
   const hasActiveFilters = query.trim().length > 0 || category !== 'all' || equipment !== 'all'
   const activeFilterCount = Number(category !== 'all') + Number(equipment !== 'all')

@@ -33,7 +33,7 @@ test('offline edit survives a full reload through Dashboard and can finish', asy
     await expectAppReady(page, '/dashboard')
   })
   // Desktop reaches TopNav first; below lg that button is hidden and the return bar carries it.
-  await page.getByRole('button', { name: /^(?:Resume workout|Return to workout)$/ }).first().click()
+  await page.getByRole('button', { name: /^Resume / }).first().click()
   await selectSet(page, 1)
   await expect(page.getByLabel(repsLabel)).toHaveValue('7')
   await expect.poll(serverReps, { timeout: 20_000 }).toBe('7')

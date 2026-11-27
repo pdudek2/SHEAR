@@ -1,7 +1,7 @@
 import type { ActiveWorkout, WorkoutExercise, WorkoutSet } from './session'
 import { createLocalId } from './session'
 import { clampSetValue, completedSetError, isValidCompletedSet, MAX_DONE_SETS_PER_EXERCISE, MAX_SESSION_EXERCISES } from '../../src/shared/workoutLimits'
-import { applyOverload as applyOverloadToSets, carryLoggedWeight } from '../../src/shared/nextSessionRecommendation'
+import { applyCorrection, applyOverload as applyOverloadToSets, carryLoggedWeight, startCorrection, type WeightCorrection } from '../../src/shared/nextSessionRecommendation'
 
 export { MAX_SESSION_EXERCISES }
 
@@ -21,6 +21,25 @@ function updateTarget(
   }
 }
 
+// A weight correction of a logged set, started on the session before the edit; the caller keeps it while that set is edited.
+export function startWeightCorrection(session: ActiveWorkout, exerciseId: string, setId: string): WeightCorrection | null {
+  const exercise = session.exercises.find((candidate) => candidate.clientId === exerciseId)
+  const index = exercise?.sets.findIndex((set) => set.clientId === setId) ?? -1
+  return exercise && index >= 0 ? startCorrection(exercise.sets, index) : null
+}
+
+export function applyWeightCorrection(session: ActiveWorkout, exerciseId: string, setId: string, correction: WeightCorrection): { session: ActiveWorkout; correction: WeightCorrection } {
+  let next = correction
+  const exercises = session.exercises.map((exercise) => {
+    const index = exercise.clientId === exerciseId ? exercise.sets.findIndex((set) => set.clientId === setId) : -1
+    if (index < 0) return exercise
+    const applied = applyCorrection(exercise.sets, index, correction)
+    next = applied.correction
+    return applied.sets === exercise.sets ? exercise : { ...exercise, sets: applied.sets }
+  })
+  return { session: { ...session, exercises }, correction: next }
+}
+
 export function updateSetValue(
   session: ActiveWorkout,
   exerciseId: string,
@@ -29,8 +48,8 @@ export function updateSetValue(
   value: string,
 ): ActiveWorkout {
   return updateTarget(session, exerciseId, setId, (set) => {
-    const next = { ...set, [field]: value }
-    return settleDone(next, next.done && isValidCompletedSet(next))
+    const edited = { ...set, [field]: value }
+    return settleDone(edited, edited.done && isValidCompletedSet(edited))
   })
 }
 
@@ -69,8 +88,8 @@ export function adjustSetValue(
   delta: number,
 ): ActiveWorkout {
   return updateTarget(session, exerciseId, setId, (set) => {
-    const next = { ...set, [field]: adjustedValue(set[field], field, delta) }
-    return settleDone(next, next.done && isValidCompletedSet(next))
+    const adjusted = { ...set, [field]: adjustedValue(set[field], field, delta) }
+    return settleDone(adjusted, adjusted.done && isValidCompletedSet(adjusted))
   })
 }
 

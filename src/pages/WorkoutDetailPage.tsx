@@ -564,7 +564,7 @@ export default function WorkoutDetailPage() {
             <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Workout not found.</p>
           )}
           <button onClick={handleBack} style={{ color: 'var(--accent)' }}>
-            {workoutResult ? 'Back to Home' : 'Back'}
+            {workoutResult ? 'Back to Train' : 'Back'}
           </button>
         </div>
       </div>
@@ -654,7 +654,7 @@ export default function WorkoutDetailPage() {
           whileTap={{ scale: 0.97 }}
         >
           {workoutResult ? <ArrowLeft size={16} aria-hidden="true" /> : <ChevronLeft size={16} aria-hidden="true" />}
-          {workoutResult ? 'Back to Home' : (location.state as { from?: string } | null)?.from === 'train' ? 'Train' : 'History'}
+          {workoutResult ? 'Back to Train' : (location.state as { from?: string } | null)?.from === 'train' ? 'Train' : 'History'}
         </motion.button>
 
         {workoutResult && !isEditing && (

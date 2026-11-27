@@ -4,7 +4,7 @@ import test from 'node:test'
 import { displayWeightDeltaToKg, displayWeightStringToKg, kgStringToDisplayWeight } from '../../src/shared/weightUnits'
 import {
   addExercise, addSet, adjustSetValue, applyOverload, exerciseHasEnteredSets, MAX_SESSION_EXERCISES, prefillFirstSet,
-  removeExercise, removeSet, setDoneError, setLabel, setSetDone, updateSetValue,
+  applyWeightCorrection, removeExercise, removeSet, setDoneError, setLabel, setSetDone, startWeightCorrection, updateSetValue,
 } from './setMutations'
 import type { ActiveWorkout } from './session'
 
@@ -49,6 +49,27 @@ test('a set carries its completion time only while it is done', () => {
   assert.equal(adjustSetValue(done, 'exercise-a', 'set-a', 'weight', 2.5).exercises[0]?.sets[0]?.completedAt, stamped)
   assert.equal('completedAt' in setSetDone(done, 'exercise-a', 'set-a', false).exercises[0]!.sets[0]!, false)
   assert.equal('completedAt' in updateSetValue(done, 'exercise-a', 'set-a', 'reps', '').exercises[0]!.sets[0]!, false)
+})
+
+test('correcting the weight of a logged set moves the open sets chosen when the correction started', () => {
+  const planned = updateSetValue(updateSetValue(workout(), 'exercise-a', 'set-b', 'weight', '80'), 'exercise-a', 'set-b', 'reps', '5')
+  const slipped = setSetDone(updateSetValue(planned, 'exercise-a', 'set-a', 'weight', '90'), 'exercise-a', 'set-a', true)
+  assert.equal(slipped.exercises[0]?.sets[1]?.weight, '90')
+  const correction = startWeightCorrection(slipped, 'exercise-a', 'set-a')!
+  assert.deepEqual(correction.followers, ['set-b'])
+  const edit = (session: ActiveWorkout, value: string) => applyWeightCorrection(updateSetValue(session, 'exercise-a', 'set-a', 'weight', value), 'exercise-a', 'set-a', correction)
+  assert.deepEqual(edit(slipped, '80').session.exercises[0]?.sets.map((set) => [set.weight, set.done]), [['80', true], ['80', false]])
+  assert.equal(applyWeightCorrection(adjustSetValue(slipped, 'exercise-a', 'set-a', 'weight', -10), 'exercise-a', 'set-a', correction).session.exercises[0]?.sets[1]?.weight, '80')
+  // A cleared weight (a bodyweight set) reaches the follower too.
+  assert.deepEqual(edit(slipped, '').session.exercises[0]?.sets.map((set) => set.weight), ['', ''])
+  // A follower changed by something else since the last edit leaves the correction.
+  const moved = edit(slipped, '85')
+  const raised = applyOverload(moved.session, 'exercise-a', { weight: 102.5 })
+  const after = applyWeightCorrection(updateSetValue(raised, 'exercise-a', 'set-a', 'weight', '80'), 'exercise-a', 'set-a', moved.correction)
+  assert.deepEqual(after.session.exercises[0]?.sets.map((set) => set.weight), ['80', '102.5'])
+  // An open set at another weight is not a follower.
+  const own = updateSetValue(slipped, 'exercise-a', 'set-b', 'weight', '95')
+  assert.deepEqual(startWeightCorrection(own, 'exercise-a', 'set-a')?.followers, [])
 })
 
 test('completion enforces finalizer bounds and invalid reps unmark a set', () => {

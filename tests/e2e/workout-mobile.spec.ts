@@ -251,6 +251,8 @@ test.describe('Active workout shell reduction', () => {
     expect(readyLayout.maxScroll).toBeLessThanOrEqual(1)
     expect(readyLayout.sessionGridBottomPadding).toBeLessThanOrEqual(1)
 
+    // The last open set of a session has no rest after it, so the rest needs a second set.
+    await page.getByRole('button', { name: /Add set/i }).click()
     await fillCurrentSet(page, '60', '8')
     await page.getByRole('button', { name: 'Mark set 1 for Squat' }).click()
 
@@ -280,6 +282,8 @@ test.describe('Active workout shell reduction', () => {
     expect(fixedUiGeometry.panelBottom).toBeLessThanOrEqual(fixedUiGeometry.viewportHeight)
     expect(fixedUiGeometry.restTimerHeight).toBeLessThanOrEqual(84)
     expect(fixedUiGeometry.restTimerPadding).toBe(0)
+    await fillCurrentSet(page, '60', '8')
+    await page.getByRole('button', { name: 'Mark set 2 for Squat' }).click()
     await page.setViewportSize({ width: 390, height: 844 })
     await addExercise(page, 'Bench Press')
     const onlyCard = page.locator('.workout-exercise-card')
@@ -520,8 +524,8 @@ test.describe('Active workout shell reduction', () => {
     await panel.getByRole('button', { name: 'Adjust reps by -1', exact: true }).click()
     await expect(repsInput).toHaveValue('8')
     await panel.getByRole('button', { name: 'Log set 1 for Squat' }).click()
-    // A logged row is muted with its check.
-    await expect(page.getByRole('button', { name: 'Unmark set 1 for Squat' })).toHaveCSS('color', 'rgb(168, 159, 152)')
+    // A logged row has a bone check, as on Android.
+    await expect(page.getByRole('button', { name: 'Unmark set 1 for Squat' })).toHaveCSS('color', 'rgb(239, 231, 220)')
 
     const sessionTimerText = await page.getByTestId('elapsed-session-timer').innerText()
     const addRestButton = panel.getByRole('button', { name: 'Add 30 seconds' })

@@ -40,7 +40,7 @@ test('the session shows one exercise: the queue, the target and the panel set ag
   assert.equal(exerciseSummaryLabel([], 'kg'), '0 sets')
   assert.equal(estimatedOneRepMax(90, 5), 105)
   assert.equal(setPairLabel({ weight: '51.25', reps: '8' }, 'kg'), '51.25 × 8')
-  assert.equal(setPairLabel({ weight: '', reps: '' }, 'kg'), '0 × 0')
+  assert.equal(setPairLabel({ weight: '', reps: '' }, 'kg'), '—')
   const sets = [{ clientId: 'a', done: true }, { clientId: 'b', done: false }, { clientId: 'c', done: false }]
   assert.equal(panelSetIndex(sets, null), 1)
   assert.equal(panelSetIndex(sets, 'a'), 0)

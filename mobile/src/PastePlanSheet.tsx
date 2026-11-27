@@ -9,13 +9,14 @@ import { useSessionRead } from './useSessionRead'
 import { colors, primaryGradient, fieldColors } from './theme'
 import { importPlanText } from '../../src/shared/planImport'
 
-const EXAMPLE = 'Upper\nBench press 4x8 60 kg\nPull-up 3x8\n\nLower\nSquat 3x5 @80'
+const EXAMPLE = 'Example:\nUpper\nBench press 4x8 60 kg\nPull-up 3x8\n\nLower\nSquat 3x5 @80'
 
 export function PastePlanSheet({ uid, onClose, returnTo }: { uid: string; onClose: () => void; returnTo?: 'dashboard' }) {
   const editor = returnTo ? { pathname: '/templates/new' as const, params: { returnTo } } : '/templates/new' as const
   const router = useRouter()
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [empty, setEmpty] = useState(false)
   const [collision, setCollision] = useState(false)
   const [busy, setBusy] = useState(false)
   const load = useCallback(() => readExerciseMetadata(uid), [uid])
@@ -27,11 +28,11 @@ export function PastePlanSheet({ uid, onClose, returnTo }: { uid: string; onClos
     const own = catalog.state.status === 'ready'
       ? catalog.state.data.map((exercise) => ({ exerciseId: exercise.id, exerciseSource: 'user' as const, name: exercise.name, muscles: exercise.muscles }))
       : []
-    setBusy(true); setError(null); setCollision(false)
+    setBusy(true); setError(null); setEmpty(false); setCollision(false)
     try {
       const units = await readUnits(uid)
       const pasted = importPlanText(text, own, units)
-      if (!pasted) { setError('No exercises found. Write one exercise per line with its sets, like “Bench press 4x8 60 kg”.'); return }
+      if (!pasted) { setEmpty(true); return }
       const draft = importedPlanDraft(pasted, units, createSessionRevision)
       if (!await planEditorJournal.installIfEmpty(uid, draft, createSessionRevision())) { setCollision(true); return }
       close(() => router.push(editor))
@@ -41,10 +42,14 @@ export function PastePlanSheet({ uid, onClose, returnTo }: { uid: string; onClos
   }
 
   return <BottomSheet title="Paste a plan" onClose={onClose}>{(close) => <View>
-    <Text style={styles.help}>Day names on their own line, then one exercise per line with sets, reps and weight. You check the result before saving.</Text>
-    <TextInput accessibilityLabel="Plan text" multiline value={text} maxLength={20000} onChangeText={(value) => { setText(value); setError(null) }}
-      placeholder={EXAMPLE} placeholderTextColor={colors.muted} {...fieldColors} textAlignVertical="top" style={styles.field} />
+    <Text style={styles.help}>Day names on their own line, then one exercise per line with sets, reps and weight. Leave the numbers out of every line and each exercise starts at 4×8. You check the result before saving.</Text>
+    <TextInput accessibilityLabel="Plan text" multiline value={text} maxLength={20000} onChangeText={(value) => { setText(value); setError(null); setEmpty(false) }}
+      placeholder={EXAMPLE} placeholderTextColor={colors.mutedSoft} {...fieldColors} textAlignVertical="top" style={styles.field} />
     {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+    {empty && <View accessibilityRole="alert">
+      <Text style={styles.error}>No exercises found. Write one exercise per line, like “Bench press 4x8 60 kg”, or build the plan by hand.</Text>
+      <Pressable accessibilityRole="button" onPress={() => close(() => router.push(editor))} style={styles.link}><Text style={styles.linkText}>Build it by hand</Text></Pressable>
+    </View>}
     {collision && <View style={styles.collision}>
       <Text style={styles.help}>A new plan draft is already on this device. Finish or discard it before pasting another plan.</Text>
       <Pressable accessibilityRole="button" onPress={() => close(() => router.push(editor))} style={styles.link}><Text style={styles.linkText}>Open the draft</Text></Pressable>

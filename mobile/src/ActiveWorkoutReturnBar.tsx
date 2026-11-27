@@ -43,7 +43,7 @@ export function ResumeButton() {
   const router = useRouter()
   const elapsed = useElapsed(session?.startedAt)
   if (!session) return null
-  return <Pressable accessibilityRole="button" accessibilityLabel={`Return to workout, ${elapsed}`} onPress={() => router.dismissTo('/')}
+  return <Pressable accessibilityRole="button" accessibilityLabel={`Resume ${session.label?.trim() || 'workout'}, ${elapsed}`} onPress={() => router.dismissTo('/')}
     style={({ pressed }) => [styles.resume, pressed && styles.pressed]}>
     <Text numberOfLines={1} style={styles.resumeText}>Resume {session.label?.trim() || 'workout'} · {elapsed}</Text>
   </Pressable>

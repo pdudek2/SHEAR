@@ -95,7 +95,8 @@ export function upNextQueue(exercises: FlowExercise[], currentIndex: number): nu
 // Seconds of rest after the set just logged (the state already counts it); 0 while its round is still open.
 export function restAfterSet(exercises: FlowExercise[], exerciseIndex: number, roles: readonly Role[], shortRest: boolean): number {
   const exercise = exercises[exerciseIndex]
-  if (!exercise) return 0
+  // After the last open set of the session nothing is left to rest for: Finish comes next.
+  if (!exercise || exercises.every((other) => other.sets.every((set) => set.done))) return 0
   const role = roles[exerciseIndex] ?? 'compound'
   const round = exercise.sets.filter((set) => set.done).length
   const peers = exercise.group
@@ -121,6 +122,13 @@ export function restoredRest(exercises: RestExercise[], roles: readonly Role[], 
   const totalSec = restAfterSet(exercises, latest.exerciseIndex, roles, shortRest)
   return totalSec > 0 && latest.at + totalSec * 1000 > now && latest.at <= now ? { startedAt: latest.at, totalSec } : null
 }
+export const latestLoggedAt = (exercises: RestExercise[]): number => latestLogged(exercises)?.at ?? 0
+// Adding a set or an exercise after the session's last open set was logged: that set had nothing left to rest for,
+// and now the rest after it is due, from the time it was logged.
+export function resumedRest(exercises: RestExercise[], roles: readonly Role[], shortRest: boolean, now: number): { startedAt: number; totalSec: number } | null {
+  if (!exercises.some((exercise) => exercise.sets.length) || exercises.some((exercise) => exercise.sets.some((set) => !set.done))) return null
+  return restoredRest([...exercises, { sets: [{ done: false }] }], roles, shortRest, now)
+}
 // Checks the session when its newest logged set moves forward: a cached snapshot followed by a newer one from the server,
 // or a set logged on another device, brings its rest back. Undoing a set moves it back and changes nothing, and a rest
 // this device started for that set (+30 s, Skip) stays as it is.
@@ -140,6 +148,7 @@ export function panelSetIndex(sets: { clientId?: string; done: boolean }[], sele
   return selected >= 0 ? selected : sets.findIndex((set) => !set.done)
 }
 export function setPairLabel(set: Pick<DisplaySet, 'weight' | 'reps'>, units: WeightUnits): string {
+  if (!set.weight.trim() && !set.reps.trim()) return '—'
   return `${kgToDisplayWeight(parseWeight(set.weight), units)} × ${parseReps(set.reps)}`
 }
 export function exerciseTargetLabel(sets: DisplaySet[], units: WeightUnits): string {
