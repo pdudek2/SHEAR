@@ -65,7 +65,7 @@ export async function consumePlanResponse(response: Response, signal: AbortSigna
 
 export function generatedPlanDraft(plan: GeneratedPlan, units: WeightUnits, newId: () => string, save: boolean): PlanDraft {
   const days = plan.days.map(day => ({ rowId: newId(), name: day.name, exercises: day.exercises.map(exercise => {
-    const weight = String(kgToDisplayWeight(exercise.targetWeight, units))
+    const weight = exercise.targetWeight ? String(kgToDisplayWeight(exercise.targetWeight, units)) : ''
     return { ...exercise, rowId: newId(), sets: String(exercise.sets), targetReps: String(exercise.targetReps), weight,
       originalWeightKg: exercise.targetWeight, originalWeightDisplay: weight }
   }) }))

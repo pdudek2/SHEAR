@@ -84,7 +84,7 @@ export default function SavedWorkoutScreen() {
     <SafeAreaView edges={['top']} style={styles.screen}>
       <StatusBar style="light" />
       <HistoryHeader />
-      <ActiveWorkoutReturnBar top />
+      {!resultIsValid && <ActiveWorkoutReturnBar top />}
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.navRow}>
           <Pressable accessibilityRole="button" accessibilityLabel={resultIsValid ? 'Back to Train' : `Back to ${from === 'train' ? 'Train' : 'History'}`} onPress={back} style={styles.backButton}>
@@ -176,7 +176,7 @@ export default function SavedWorkoutScreen() {
       {resultIsValid && <View style={[styles.doneDock, plateRow]}>
         <Pressable accessibilityRole="button" onPress={back} style={({ pressed }) => [styles.done, pressed && styles.donePressed]}><Text style={styles.doneText}>Done</Text></Pressable>
       </View>}
-      {resultIsValid && <BottomNavigation />}
+      {resultIsValid && <BottomNavigation savedWorkout />}
       {moreOpen && <BottomSheet title={heroLabel} onClose={() => setMoreOpen(false)}>
         {(close) => <Pressable accessibilityRole="button" onPress={() => close(() => router.push({ pathname: '/workout-edit/[workoutId]', params: { workoutId, action: 'delete' } }))} style={styles.sheetRow}>
           <Text style={styles.sheetRowQuiet}>Delete workout</Text><Icon name="trash" size={16} />
@@ -205,7 +205,6 @@ const styles = StyleSheet.create({
       navRow: { alignItems: 'center', flexDirection: 'row', minHeight: 44 },
   backButton: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 5, minHeight: 44, paddingHorizontal: 1 },
   backText: { color: colors.muted, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 13 },
-  check: { color: colors.accentText, fontFamily: 'InstrumentSans_700Bold', fontSize: 18 },
   resultLine: { alignItems: 'center', flexDirection: 'row', gap: 6, marginBottom: 4 },
   resultTitle: { color: colors.text, fontFamily: 'InstrumentSans_500Medium', fontSize: 14 },
   doneDock: { paddingHorizontal: 16, paddingVertical: 10 },

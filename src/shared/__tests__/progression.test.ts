@@ -126,6 +126,7 @@ describe('trialWeight', () => {
   it('makes the first set a test without a cap when the exercise has no history and no plan weight', () => {
     const fresh = run([], { target: { reps: 10, sets: 3, weight: 0 }, equipment: 'dumbbell' })!
     expect(fresh).toMatchObject({ weight: null, reps: 10, change: 'none', trial: { maxWeight: null }, step: 2 })
+    expect(progressionHintLabel(fresh, 'kg')).toBeNull()
     expect(trialWeight(fresh, { weight: 14, reps: 10 })).toBe(14)
     expect(trialWeight(fresh, { weight: 14, reps: 15 })).toBe(14)
     expect(trialWeight(fresh, { weight: 15, reps: 6 })).toBe(13)

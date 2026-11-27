@@ -16,3 +16,9 @@ export function tabNavigation(path: string, tab: NavigationTab): { kind: 'dismis
   if (path === TAB_ROUTES.History || path === TAB_ROUTES.Progress || path === TAB_ROUTES.Coach) return { kind: 'replace', href }
   return { kind: 'navigate', href }
 }
+
+// The screen after Finish belongs to Train: a tab first goes back to Train, so Back from it never returns to the result.
+export function savedWorkoutTabNavigation(tab: NavigationTab): { kind: 'dismissTo' | 'replace' | 'navigate'; href: string }[] {
+  const train = { kind: 'dismissTo' as const, href: TAB_ROUTES.Train }
+  return tab === 'Train' ? [train] : [train, tabNavigation(TAB_ROUTES.Train, tab)]
+}

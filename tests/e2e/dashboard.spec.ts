@@ -36,13 +36,18 @@ test.describe('Dashboard regressions', () => {
     }
   })
 
-  test('renders one week summary without removed weekly surfaces', async ({ page }) => {
+  test('renders one week summary without removed weekly surfaces', async ({ page, cleanup }) => {
+    test.skip(!emulatorMode, 'emulator-only deterministic fixture')
+    // A new account has no week strip, so the account gets a workout first.
+    const sessionId = 'phase-1-dashboard-week-strip'
+    cleanup.add('remove week-strip workout', () => deleteLifecycleWorkout(sessionId))
+    await seedLifecycleWorkout({ sessionId, materialized: true, label: 'Phase 1 week strip' })
     await openDashboard(page)
 
     await expect(page.locator('.dashboard-metric-strip')).toHaveCount(0)
     await expect(page.locator('.dashboard-week-pulse')).toHaveCount(0)
     await expect(page.locator('.dashboard-overview-grid')).toHaveCount(0)
-    expect(await page.locator('.train-days:visible').count()).toBeLessThanOrEqual(1)
+    await expect(page.locator('.train-days:visible')).toHaveCount(1)
   })
 
   test('leaves workout and plan lists to History and Plans', async ({ page, cleanup }) => {

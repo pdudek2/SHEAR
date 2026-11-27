@@ -51,7 +51,7 @@ import {
   storedValueToSetInput,
 } from '../src/setInput'
 import { getAuthErrorMessage } from '../../src/shared/authErrors'
-import { bestSet, EQUIPMENT_LABELS, removeSetMessage, exerciseTargetLabel, focusExerciseIndex, formatPreviousSet, nextGroupMember, latestLoggedAt, panelSetIndex, reconcileRest, restAfterSet, resumedRest, roundRows, sessionBlocks, setPairLabel, type RestCheck, setPanelRestLabel, setPanelStatus, upNextQueue, WORKOUT_LABELS } from '../../src/shared/workoutDisplay'
+import { bestSet, EQUIPMENT_LABELS, removeSetMessage, exerciseTargetLabel, focusExerciseIndex, formatPreviousSet, nextGroupMember, latestLoggedAt, panelSetIndex, reconcileRest, restAfterSet, resumedRest, roundRows, sessionBlocks, setPairLabel, setPairSpokenLabel, type RestCheck, setPanelRestLabel, setPanelStatus, upNextQueue, WORKOUT_LABELS } from '../../src/shared/workoutDisplay'
 import { catalogueMeta, sessionRoles } from '../../src/shared/nextSessionRecommendation'
 import { groupRestSec } from '../../src/shared/compression'
 import { planCut } from '../../src/shared/sessionCut'
@@ -480,7 +480,7 @@ function ExerciseLedger({ history, exercise, units, metadata, target, lowReadine
             {set.done ? <SetTick draw={drawnSetId === set.clientId} />
               : <Text style={[styles.setToggle, current && styles.setToggleCurrent]}>{index + 1}</Text>}
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Edit set ${index + 1}: last ${previousText}, today ${today}`} accessibilityState={{ selected: current }}
+          <Pressable accessibilityRole="button" accessibilityLabel={`Edit set ${index + 1}: last ${previousText}, today ${setPairSpokenLabel(set, units)}`} accessibilityState={{ selected: current }}
             onPress={() => onSelectSet(set.clientId)} style={styles.setValues}>
             <Text numberOfLines={1} style={[styles.setCellMuted, styles.setValue]}>{previousText}</Text>
             <Text numberOfLines={1} style={[styles.setToday, styles.setValue, set.done && styles.setTodayDone, current && styles.setTodayCurrent]}>{today}</Text>
@@ -578,7 +578,7 @@ function GroupBlock({ uid, session, indices, currentIndex, panelSet, units, edit
             onPress={() => editing.setDone(exercise.clientId, set.clientId, !set.done)} style={[styles.setToggleColumn, styles.setTouchTarget]}>
             {set.done ? <SetTick draw={drawnSetId === set.clientId} /> : <Text style={[styles.setToggle, current && styles.setToggleCurrent]}>{label}</Text>}
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityState={{ selected: current }} accessibilityLabel={`${label}, ${exercise.name}: last ${previous}, today ${setPairLabel(set, units)}${set.done ? ', logged' : ''}`}
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: current }} accessibilityLabel={`${label}, ${exercise.name}: last ${previous}, today ${setPairSpokenLabel(set, units)}${set.done ? ', logged' : ''}`}
             onPress={() => onSelect(exercise.clientId, set.clientId)} style={styles.setValues}>
             <Text numberOfLines={1} style={[styles.setCellMuted, styles.setValue]}>{previous}</Text>
             <Text numberOfLines={1} style={[styles.setToday, styles.setValue, set.done && styles.setTodayDone, current && styles.setTodayCurrent]}>{setPairLabel(set, units)}</Text>

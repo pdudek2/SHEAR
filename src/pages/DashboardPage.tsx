@@ -638,6 +638,9 @@ export default function DashboardPage() {
   // Picking a workout means the next session matters more than the finished week.
   const weekClosed = !plansLoading && !hasActiveSession && !workoutPicked && weeklyDone >= weeklyGoal
   // After today's workout the plan's next day is what comes next, not a second session today.
+  // A new account has no plans and no workouts: the way in matters more than Plans or an empty week.
+  // Plans still loading count as none, so the two do not flash before the empty list arrives.
+  const emptyAccount = (noPlans || templatesState.status === 'loading') && workouts.length === 0
   const doneToday = !plansLoading && !hasActiveSession && !weekClosed && quickTemplateDay ? workoutToday(workouts, today) : null
   const doneTodaySets = doneToday?.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0) ?? 0
   const sessionLabel = active ? active.label?.trim() || 'Workout' : null
@@ -846,7 +849,7 @@ export default function DashboardPage() {
             {!isDesktop && dock}
 
             <div className="train-links">
-              {!noPlans && <button type="button" className="train-link" onClick={() => navigate('/templates')}>Plans</button>}
+              {!emptyAccount && <button type="button" className="train-link" onClick={() => navigate('/templates')}>Plans</button>}
               {!hasActiveSession && templatesState.status === 'success' && templates.some((template) => template.days.some((day) => day.exercises.length > 0)) && (
                 <button
                   type="button"
@@ -871,8 +874,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="train-side">
-            {/* An account with no plans and no workouts has an empty week to show; the way in matters more. */}
-            {!(noPlans && workouts.length === 0) && <motion.div className="train-week" {...fadeUp(0.09)}>
+            {!emptyAccount && <motion.div className="train-week" {...fadeUp(0.09)}>
               <div className="train-week-head">
                 <h2>This week</h2>
                 <span>

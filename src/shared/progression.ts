@@ -169,7 +169,9 @@ function signedWeight(deltaKg: number, units: WeightUnits): string {
 
 const perDumbbell = (equipment?: string) => (equipment === 'dumbbell' ? ' per dumbbell' : '')
 
-export function progressionHintLabel(progression: Progression, units: WeightUnits, equipment?: string): string {
+// An exercise without history has nothing to say before its first set.
+export function progressionHintLabel(progression: Progression, units: WeightUnits, equipment?: string): string | null {
+  if (progression.trial?.maxWeight === null) return null
   if (progression.trial) {
     return progression.weight !== null && progression.delta < 0
       ? `Long break: first set is a test at ${signedWeight(progression.delta, units)}${perDumbbell(equipment)}`
@@ -199,17 +201,16 @@ export function sessionHint(progression: Progression | null, sets: SessionSet[],
 
   if (progression.trial) {
     const done = sets.filter((set) => set.done).map((set) => ({ weight: Number.parseFloat(set.weight) || 0, reps: Number.parseInt(set.reps, 10) || 0 }))
-    const fresh = progression.trial.maxWeight === null
-    if (!done.length) return progression.weight !== null && differs('weight', progression.weight) ? { label, weight: progression.weight } : fresh ? null : { label }
+    if (!done.length) return label === null ? null : progression.weight !== null && differs('weight', progression.weight) ? { label, weight: progression.weight } : { label }
     // The heaviest logged set sets the scale, so a warm-up never counts as the test.
     const reference = progression.weight ?? Math.max(...done.map((set) => set.weight))
     const test = done.find((set) => set.weight >= reference * 0.8)
-    if (!test) return progression.ceiling > 3 && !fresh ? { label } : null
+    if (!test) return progression.ceiling > 3 && label !== null ? { label } : null
     const weight = trialWeight(progression, test, units)
     if (weight === null) return null
     return differs('weight', weight) ? { label: trialHintLabel(weight, units, equipment), weight } : null
   }
-  if (progression.weight === null) return null
+  if (progression.weight === null || label === null) return null
   if (progression.change === 'weight' && differs('weight', progression.weight)) {
     return { label, weight: progression.weight, reps: progression.reps }
   }

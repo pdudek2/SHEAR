@@ -109,10 +109,11 @@ export default function ExercisePicker({ userExercises, recent = [], suggestions
         renderItem={({ item }) => row(item)}
         extraData={picks}
       />
-      {onSelectMany && picks.length > 0 && <Pressable accessibilityRole="button" onPress={() => close(() => onSelectMany(picks))}
-        style={({ pressed }) => [styles.pickerAdd, { marginBottom: Math.max(16, insets.bottom + 8) }, pressed && styles.pickerPressed]}>
-        <Text style={styles.pickerAddText}>Add {picks.length} {picks.length === 1 ? 'exercise' : 'exercises'}</Text>
-      </Pressable>}
+      {onSelectMany && picks.length > 0 && <KeyboardLift rest={Math.max(16, insets.bottom + 8)} gap={8}>
+        <Pressable accessibilityRole="button" onPress={() => close(() => onSelectMany(picks))} style={({ pressed }) => [styles.pickerAdd, pressed && styles.pickerPressed]}>
+          <Text style={styles.pickerAddText}>Add {picks.length} {picks.length === 1 ? 'exercise' : 'exercises'}</Text>
+        </Pressable>
+      </KeyboardLift>}
     </>
   }}</BottomSheet>
 }

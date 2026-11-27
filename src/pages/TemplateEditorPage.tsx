@@ -30,7 +30,7 @@ import {
 import { pluralize } from '../lib/pluralize'
 import { ApiRejectedError } from '../lib/authedApi'
 import { newPlanDayId } from '../shared/planDay'
-import { picksForDay, type ExercisePick } from '../shared/exercisePicks'
+import { picksForDay, skippedPicksMessage, type ExercisePick } from '../shared/exercisePicks'
 import { MAX_SESSION_EXERCISES } from '../shared/workoutLimits'
 import { acceptSetInput } from '../shared/setInput'
 import { createUserExercise, type UserExerciseInput } from '../lib/userExercisesService'
@@ -320,9 +320,11 @@ export default function TemplateEditorPage() {
 
   function addExercisesToDay(dayIndex: number, picks: ExercisePick[]) {
     // Checked before the update: a state updater may run twice and must not show the toast itself.
-    const { added, skipped } = picksForDay(days[dayIndex]?.exercises ?? [], picks, MAX_SESSION_EXERCISES)
-    if (skipped > 0) toast.message(added.length ? 'Some exercises were already in this day or over its limit.' : 'These exercises are already in this day.')
-    setDays((prev) => prev.map((day, index) => index !== dayIndex ? day : {
+    const result = picksForDay(days[dayIndex]?.exercises ?? [], picks, MAX_SESSION_EXERCISES)
+    const { added } = result
+    const skipped = skippedPicksMessage(result, MAX_SESSION_EXERCISES)
+    if (skipped) toast.message(skipped)
+    if (added.length) setDays((prev) => prev.map((day, index) => index !== dayIndex ? day : {
       ...day,
       exercises: [
         ...day.exercises,
@@ -726,7 +728,8 @@ export default function TemplateEditorPage() {
                   <motion.button
                     type="button"
                     onClick={() => setPickerDayIndex(selectedDayIndex)}
-                    className={`${selectedDay.exercises.length === 0 ? 'planner-primary-action' : 'planner-secondary-action'} template-day-add-exercise`}
+                    disabled={selectedDay.exercises.length >= MAX_SESSION_EXERCISES}
+                    className={`${selectedDay.exercises.length === 0 ? 'planner-primary-action' : 'planner-secondary-action'} template-day-add-exercise disabled:opacity-50`}
                     whileTap={{ scale: 0.97 }}
                   >
                     <Plus size={15} />

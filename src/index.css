@@ -2334,6 +2334,19 @@ body:has(.bottom-nav[aria-hidden="true"]) {
   font-weight: 600;
 }
 
+/* On a phone Done sits above the tab bar, as on Android; the content's bottom padding keeps the list clear of it. */
+@media (max-width: 1023px) {
+  .workout-detail-content .workout-result-done {
+    position: fixed;
+    right: 1rem;
+    bottom: calc(var(--plate-tabs) + env(safe-area-inset-bottom, 0px) + 0.75rem);
+    left: 1rem;
+    z-index: 40;
+    width: auto;
+    margin-top: 0;
+  }
+}
+
 .workout-detail-back {
   display: inline-flex;
   min-height: 2.75rem;
@@ -9200,6 +9213,8 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
   flex: none;
   width: 100%;
   margin-top: 0.75rem;
+  /* Clear of the home indicator, and of an on-screen keyboard that overlays the page while searching. */
+  margin-bottom: max(1rem, env(safe-area-inset-bottom), calc(var(--mobile-viewport-bottom-inset, 0px) + 0.75rem));
   border-radius: 0.9375rem;
   font-weight: 600;
 }

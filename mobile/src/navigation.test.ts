@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { navigationSection, tabNavigation } from './navigation'
+import { navigationSection, savedWorkoutTabNavigation, tabNavigation } from './navigation'
 
 test('child routes retain their navigation section and unknown routes do not invent one', () => {
   for (const path of ['/dashboard', '/templates', '/templates/new', '/templates/abc/edit', '/exercises', '/exercises/global/squat', '/exercises/user/squat']) assert.equal(navigationSection(path), 'Train')
@@ -17,4 +17,8 @@ test('tabs swap each other and Train pops back, so Back never replays the tab hi
   assert.deepEqual(tabNavigation('/', 'Train'), { kind: 'replace', href: '/dashboard' })
   // A child screen keeps its place under the next tab, as before.
   assert.deepEqual(tabNavigation('/templates', 'Coach'), { kind: 'navigate', href: '/coach' })
+})
+test('from the screen after Finish a tab goes through Train, so Back never returns to the result', () => {
+  assert.deepEqual(savedWorkoutTabNavigation('Train'), [{ kind: 'dismissTo', href: '/dashboard' }])
+  assert.deepEqual(savedWorkoutTabNavigation('History'), [{ kind: 'dismissTo', href: '/dashboard' }, { kind: 'navigate', href: '/history' }])
 })

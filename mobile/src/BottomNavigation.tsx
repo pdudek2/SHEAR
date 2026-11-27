@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 import ActiveWorkoutReturnBar, { useReturnBar } from './ActiveWorkoutReturnBar'
 import { useAuthRuntime } from './runtime'
-import { navigationSection, tabNavigation, type NavigationTab } from './navigation'
+import { navigationSection, savedWorkoutTabNavigation, tabNavigation, type NavigationTab } from './navigation'
 import { colors } from './theme'
 
 export type NavigationExit = (proceed: () => void | Promise<boolean>) => void
@@ -30,12 +30,13 @@ export function usePlateHeight() {
 }
 
 // One flat plate at the bottom edge, part of the screen's column: the running workout above the tabs.
-export default function BottomNavigation({ onRequestExit }: { onRequestExit?: NavigationExit }) {
+export default function BottomNavigation({ onRequestExit, savedWorkout = false }: { onRequestExit?: NavigationExit; savedWorkout?: boolean }) {
   const router = useRouter()
   const pathname = usePathname()
   const { user } = useAuthRuntime()
   const inset = useSafeAreaInsets().bottom
-  const section = navigationSection(pathname)
+  const section = savedWorkout ? 'Train' : navigationSection(pathname)
+  const steps = (name: NavigationTab) => savedWorkout ? savedWorkoutTabNavigation(name) : [tabNavigation(pathname, name)]
   const owner = useRef(user?.uid)
   owner.current = user?.uid
   // The guard can outlive its screen while a confirmation dialog is open.
@@ -51,7 +52,7 @@ export default function BottomNavigation({ onRequestExit }: { onRequestExit?: Na
   return <View style={styles.plate}>
     {returning && <ActiveWorkoutReturnBar onRequestExit={onRequestExit} />}
     <View accessibilityRole="tablist" style={[styles.tabs, returning && styles.divided]}>
-      {(Object.keys(TABS) as NavigationTab[]).map(name => <Pressable key={name} accessibilityRole="tab" accessibilityLabel={name} accessibilityState={{ selected: section === name }} onPress={() => go(() => { const { kind, href } = tabNavigation(pathname, name); router[kind](href as Href) })} style={({ pressed }) => [styles.tab, pressed && styles.pressed]}><Icon name={name} color={section === name ? colors.textStrong : colors.muted} /><Text style={[styles.label, section === name && styles.labelSelected]}>{name}</Text></Pressable>)}
+      {(Object.keys(TABS) as NavigationTab[]).map(name => <Pressable key={name} accessibilityRole="tab" accessibilityLabel={name} accessibilityState={{ selected: section === name }} onPress={() => go(() => { for (const { kind, href } of steps(name)) router[kind](href as Href) })} style={({ pressed }) => [styles.tab, pressed && styles.pressed]}><Icon name={name} color={section === name ? colors.textStrong : colors.muted} /><Text style={[styles.label, section === name && styles.labelSelected]}>{name}</Text></Pressable>)}
     </View>
     <View style={{ height: inset }} />
   </View>

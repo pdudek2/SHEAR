@@ -3,6 +3,8 @@ import { templateFingerprint } from '../../src/shared/templateFingerprint'
 import { newPlanDayId } from '../../src/shared/planDay'
 import type { WorkoutTemplate, TemplateExercise } from './workoutLaunch'
 import type { ImportedPlan, ImportedRow } from '../../src/shared/planImport'
+import { picksForDay, skippedPicksMessage, type ExercisePick } from '../../src/shared/exercisePicks'
+import { MAX_SESSION_EXERCISES } from '../../src/shared/workoutLimits'
 
 export interface EditorExercise extends Omit<TemplateExercise, 'sets' | 'targetReps' | 'targetWeight'> {
   rowId: string
@@ -123,4 +125,13 @@ export function refreshPlanDraftUnits(draft: PlanDraft, units: WeightUnits): Pla
     const weight = String(kgToDisplayWeight(kg, units))
     return { ...exercise, weight, originalWeightKg: kg, originalWeightDisplay: weight }
   }) })) }
+}
+
+// Picks added to a day in tap order; `day` is null when nothing was added, so the draft stays as it was.
+export function addPicksToDay(day: EditorDay, picks: ExercisePick[], newId: () => string): { day: EditorDay | null; message: string | null } {
+  const result = picksForDay(day.exercises, picks, MAX_SESSION_EXERCISES)
+  const message = skippedPicksMessage(result, MAX_SESSION_EXERCISES)
+  if (!result.added.length) return { day: null, message }
+  const added = result.added.map(({ exerciseId, name, source }) => ({ rowId: newId(), exerciseId, exerciseSource: source, name, sets: '4', targetReps: '8', weight: '' }))
+  return { day: { ...day, exercises: [...day.exercises, ...added] }, message }
 }

@@ -152,6 +152,11 @@ export function setPairLabel(set: Pick<DisplaySet, 'weight' | 'reps'>, units: We
   const weight = set.weight.trim() ? kgToDisplayWeight(parseWeight(set.weight), units) : '—'
   return `${weight} × ${parseReps(set.reps)}`
 }
+// A screen reader skips the dash, so spoken labels say it.
+export function setPairSpokenLabel(set: Pick<DisplaySet, 'weight' | 'reps'>, units: WeightUnits): string {
+  const label = setPairLabel(set, units)
+  return label.startsWith('— ×') ? `no weight${label.slice(1)}` : label
+}
 export function exerciseTargetLabel(sets: DisplaySet[], units: WeightUnits): string {
   const next = sets.find((set) => !set.done) ?? sets[0]
   const reps = parseReps(next?.reps ?? '')

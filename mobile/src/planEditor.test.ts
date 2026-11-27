@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { importedPlanDraft, newPlanDraft, normalizePlanDraft, refreshPlanDraftUnits } from './planEditor'
+import { addPicksToDay, importedPlanDraft, newPlanDraft, normalizePlanDraft, refreshPlanDraftUnits } from './planEditor'
 import { importPlanText } from '../../src/shared/planImport'
 import { PlanEditorJournal, type PlanDraftSlots } from './planEditorJournal'
 import { finishAcknowledgedPlanSave, releaseRejectedPlanSave, requestPlanEditorExit } from './planEditorFlow'
@@ -293,4 +293,13 @@ test('a pasted plan keeps its open lines across a restart and saves only once th
     { exerciseId: 'barbell-curl', exerciseSource: 'global', name: 'Barbell Curl', sets: 3, targetReps: 12, targetWeight: 14 },
     { exerciseId: 'squat', exerciseSource: 'global', name: 'Squat', sets: 3, targetReps: 5, targetWeight: 45.36 },
   ])
+})
+
+test('picks add to a day in tap order, and a pick the day holds changes nothing and says why', () => {
+  const day = { rowId: 'day', name: 'Pull', exercises: [{ ...exercise('global'), exerciseId: 'pull-up', rowId: 'a', sets: '4', targetReps: '8', weight: '' }] }
+  let next = 0
+  const added = addPicksToDay(day, [{ exerciseId: 'barbell-row', name: 'Barbell Row', source: 'global' }, { exerciseId: 'pull-up', name: 'Pull-up', source: 'global' }], () => `row-${next++}`)
+  assert.deepEqual(added.day?.exercises.map((row) => [row.exerciseId, row.weight]), [['pull-up', ''], ['barbell-row', '']])
+  assert.equal(added.message, 'Some exercises were already in this day.')
+  assert.deepEqual(addPicksToDay(day, [{ exerciseId: 'pull-up', name: 'Pull-up', source: 'global' }], () => 'x'), { day: null, message: 'These exercises are already in this day.' })
 })

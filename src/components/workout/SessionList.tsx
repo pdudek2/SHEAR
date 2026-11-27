@@ -10,7 +10,7 @@ import { pluralize } from '../../lib/pluralize'
 import { planCut } from '../../shared/sessionCut'
 import { groupRestSec } from '../../shared/compression'
 import { sessionRoles, type ExerciseMeta } from '../../shared/nextSessionRecommendation'
-import { exerciseTargetLabel, formatPreviousSet, roundRows, setPairLabel } from '../../shared/workoutDisplay'
+import { exerciseTargetLabel, formatPreviousSet, roundRows, setPairLabel, setPairSpokenLabel } from '../../shared/workoutDisplay'
 
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
 
@@ -135,7 +135,7 @@ export function GroupBlock({ session, indices, currentIndex, panelSet, units, us
           className="workout-set-values tabular-nums"
           onClick={() => onSelect(member, setIndex)}
           aria-pressed={current}
-          aria-label={`${label}, ${exercise.name}: last ${last}, today ${setPairLabel(set, units)}${set.done ? ', logged' : ''}`}
+          aria-label={`${label}, ${exercise.name}: last ${last}, today ${setPairSpokenLabel(set, units)}${set.done ? ', logged' : ''}`}
         >
           <span className="workout-set-previous">{last}</span>
           <span className="workout-set-today">{setPairLabel(set, units)}</span>

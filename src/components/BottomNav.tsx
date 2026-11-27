@@ -47,10 +47,13 @@ export default function BottomNav() {
   const path = location.pathname
   const workoutActive = path.startsWith('/workout/new')
   const workoutDetail = path.startsWith('/workout/') && !workoutActive
+  // The page that follows Finish belongs to Train and keeps the tabs; other workout pages hide them.
+  const routeState = location.state as { workoutResult?: unknown; savedWorkout?: unknown } | null
+  const savedWorkout = workoutDetail && Boolean(routeState?.workoutResult || routeState?.savedWorkout)
   const go = (to: string) => navigateWithAppTransition(navigate, to)
 
   // With no session /workout/new is a resting page, so the bar stays as the way out.
-  const navHidden = (workoutActive && hasActiveSession) || workoutDetail || inputFocused
+  const navHidden = (workoutActive && hasActiveSession) || (workoutDetail && !savedWorkout) || inputFocused
 
   useEffect(() => {
     if (!navHidden) return
@@ -73,7 +76,7 @@ export default function BottomNav() {
         <NavBtn
           icon={<Dumbbell size={20} />}
           label="Train"
-          active={path === '/dashboard' || path.startsWith('/templates') || path.startsWith('/exercises')}
+          active={path === '/dashboard' || path.startsWith('/templates') || path.startsWith('/exercises') || savedWorkout}
           preloadTo="/dashboard"
           onClick={() => go('/dashboard')}
         />
