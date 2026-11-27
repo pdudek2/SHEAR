@@ -2326,7 +2326,8 @@ body:has(.bottom-nav[aria-hidden="true"]) {
   color: var(--muted);
 }
 
-.workout-result-done {
+/* Wins over the media rule that sizes planner-primary-action to its content. */
+.workout-detail-content .workout-result-done {
   width: 100%;
   margin-top: 1.5rem;
   border-radius: 0.9375rem;
@@ -9195,7 +9196,7 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
   background: var(--puls-bone);
 }
 
-.exercise-picker-add {
+.bottom-sheet .exercise-picker-add {
   flex: none;
   width: 100%;
   margin-top: 0.75rem;

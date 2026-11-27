@@ -639,6 +639,7 @@ export default function DashboardPage() {
   const weekClosed = !plansLoading && !hasActiveSession && !workoutPicked && weeklyDone >= weeklyGoal
   // After today's workout the plan's next day is what comes next, not a second session today.
   const doneToday = !plansLoading && !hasActiveSession && !weekClosed && quickTemplateDay ? workoutToday(workouts, today) : null
+  const doneTodaySets = doneToday?.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0) ?? 0
   const sessionLabel = active ? active.label?.trim() || 'Workout' : null
   const coverName = active ? workoutCover(active.label) : weekClosed ? 'week' : workoutCover(quickTemplateDay?.name ?? quickTemplate?.name)
   const record = latestRecord(workouts, today.getTime())
@@ -742,7 +743,7 @@ export default function DashboardPage() {
               {doneToday && (
                 <p className="train-done">
                   <Check size={14} aria-hidden="true" />
-                  Done today: {workoutTitle(doneToday)} · {doneToday.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0)} sets
+                  Done today: {workoutTitle(doneToday)} · {doneTodaySets} {pluralize(doneTodaySets, 'set', 'sets')}
                 </p>
               )}
             </div>

@@ -164,6 +164,7 @@ export default function DashboardScreen() {
   const weekClosed = Boolean(summary) && !plansPending && canOfferStart && !picked && (summary?.weeklyDone ?? 0) >= goal
   // After today's workout the plan's next day is what comes next, not a second session today.
   const doneToday = !plansPending && canOfferStart && !weekClosed && chosen ? workoutToday(recent, now) : null
+  const doneTodaySets = doneToday?.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0) ?? 0
   const coverName = view.active.status === 'ready' ? workoutCover(view.active.session.label) : weekClosed ? 'week' : workoutCover(chosen?.day.name ?? chosen?.template.name)
   const record = data ? latestRecord(data.workouts, now.getTime()) : null
   const launchState = view.launch
@@ -254,7 +255,7 @@ export default function DashboardScreen() {
             <Text accessibilityRole="header" style={styles.coverTitle}>{plansPending ? ' ' : view.active.status === 'ready' ? view.active.session.label?.trim() || 'Workout' : weekClosed ? 'Week done' : chosen?.day.name ?? `${getGreeting(now)}, ${data.profile.displayName}`}</Text>
             {plansPending ? <Text style={styles.coverMeta}> </Text> : weekClosed ? <Text style={styles.coverMeta}>{weekCountLabel(summary?.weeklyDone ?? 0, goal)} {pluralize(summary?.weeklyDone ?? 0, 'workout', 'workouts')} · {formatCompactVolume(summary?.weeklyVolume ?? 0, units)}</Text> : chosen ? <Text style={styles.coverMeta}>{chosen.template.name} · Day {(selection?.target?.dayIndex ?? 0) + 1} of {chosen.template.days.length}</Text>
               : view.active.status === 'empty' && recent[0] && <Text style={styles.coverMeta}>Last: {workoutTitle(recent[0])} · {new Date(recent[0].startedAt).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}</Text>}
-            {doneToday && <View style={styles.doneToday}><Icon name="check" size={14} color={colors.muted} /><Text style={styles.doneTodayText}>Done today: {workoutTitle(doneToday)} · {doneToday.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0)} sets</Text></View>}
+            {doneToday && <View style={styles.doneToday}><Icon name="check" size={14} color={colors.muted} /><Text style={styles.doneTodayText}>Done today: {workoutTitle(doneToday)} · {doneTodaySets} {pluralize(doneTodaySets, 'set', 'sets')}</Text></View>}
           </View>
           {record && <View pointerEvents="none" style={styles.coverSeam} />}
         </View>
