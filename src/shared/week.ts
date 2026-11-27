@@ -11,6 +11,13 @@ export function addLocalDays(date: Date, days: number): Date {
   return next
 }
 
+// The newest workout started on the same local day as `now` (lists come newest first), or null.
+export function workoutToday<T extends { startedAt: number }>(workouts: T[], now: Date): T | null {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const end = addLocalDays(new Date(start), 1).getTime()
+  return workouts.find((workout) => workout.startedAt >= start && workout.startedAt < end) ?? null
+}
+
 export function startOfWeek(date: Date): Date {
   const monday = new Date(date)
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))

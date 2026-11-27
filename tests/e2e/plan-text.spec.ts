@@ -21,8 +21,10 @@ async function chooseFor(page: Page, line: string, exercise: string): Promise<vo
 }
 
 async function expectFirstSetTest(page: Page, exercise: string): Promise<void> {
-  await expect(page.getByText('First set is a test', { exact: true })).toBeVisible({ timeout: 15_000 })
   const panel = page.getByRole('region', { name: 'Current set' })
+  await expect(panel).toBeVisible({ timeout: 15_000 })
+  // An exercise without history gets no note until its first set gives a weight to apply.
+  await expect(page.getByText('First set is a test', { exact: true })).toHaveCount(0)
   // A loaded set without weight is asked about instead of being logged as 0.
   await panel.getByRole('button', { name: new RegExp(`^Log set 1 for ${exercise}`) }).click()
   await expect(page.getByText('No weight entered. Log this set without weight?')).toBeVisible()
@@ -30,7 +32,9 @@ async function expectFirstSetTest(page: Page, exercise: string): Promise<void> {
   await panel.getByRole('spinbutton', { name: /^Weight,/ }).fill('60')
   await panel.getByRole('spinbutton', { name: /^Reps,/ }).fill('8')
   await panel.getByRole('button', { name: new RegExp(`^Log set 1 for ${exercise}`) }).click()
-  await expect(page.getByText(/^From your first set: \d/)).toBeVisible()
+  // The next set already carries the first set's weight, so no note repeats it.
+  await expect(panel.getByRole('spinbutton', { name: /^Weight,/ })).toHaveValue('60')
+  await expect(page.getByText(/^From your first set: \d/)).toHaveCount(0)
 }
 
 test.describe('Plan from text', () => {

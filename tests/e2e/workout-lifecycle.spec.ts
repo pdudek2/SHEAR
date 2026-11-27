@@ -146,7 +146,8 @@ test.describe('Workout lifecycle Phase 1 regressions', () => {
     const returnBar = page.getByRole('region', { name: 'Active workout' })
     await expect(returnBar).toContainText('Resume Phase 1 browse and return with a deliberately long label')
 
-    await page.getByRole('button', { name: 'Plans', exact: true }).click()
+    // Without plans Train has no Plans link; the return bar must survive opening Plans all the same.
+    await page.goto('/templates')
     await expect(page).toHaveURL('/templates')
     await expect(returnBar).toBeVisible()
     await page.getByRole('link', { name: 'Exercises' }).click()

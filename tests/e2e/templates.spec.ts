@@ -12,11 +12,12 @@ async function addExercise(page: Page, name: string): Promise<void> {
   const addButton = page.getByRole('button', { name: 'Add exercise' }).first()
   await addButton.scrollIntoViewIfNeeded()
   await addButton.click()
-  const picker = page.getByRole('dialog', { name: 'Add exercise' })
+  const picker = page.getByRole('dialog', { name: 'Add exercises' })
   await page.getByPlaceholder('Search exercises').fill(name)
   const result = picker.locator('button').filter({ hasText: new RegExp(name, 'i') }).first()
   await expect(result).toBeVisible({ timeout: 5_000 })
   await result.click()
+  await picker.getByRole('button', { name: 'Add 1 exercise' }).click()
   await expect(picker).not.toBeVisible({ timeout: 5_000 })
 }
 

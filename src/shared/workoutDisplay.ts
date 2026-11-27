@@ -149,7 +149,8 @@ export function panelSetIndex(sets: { clientId?: string; done: boolean }[], sele
 }
 export function setPairLabel(set: Pick<DisplaySet, 'weight' | 'reps'>, units: WeightUnits): string {
   if (!set.weight.trim() && !set.reps.trim()) return '—'
-  return `${kgToDisplayWeight(parseWeight(set.weight), units)} × ${parseReps(set.reps)}`
+  const weight = set.weight.trim() ? kgToDisplayWeight(parseWeight(set.weight), units) : '—'
+  return `${weight} × ${parseReps(set.reps)}`
 }
 export function exerciseTargetLabel(sets: DisplaySet[], units: WeightUnits): string {
   const next = sets.find((set) => !set.done) ?? sets[0]
@@ -208,9 +209,9 @@ export function setPanelStatus(set: { done: boolean } | null | undefined, setInd
   return set.done ? `Editing set ${setIndex + 1}` : `Set ${setIndex + 1} of ${setCount}`
 }
 
+// The rest bar names only the rest; while a logged set is open for editing it says so instead.
 export function setPanelRestLabel(set: { done: boolean } | null | undefined, setIndex: number): string {
-  if (!set) return 'Rest'
-  return set.done ? `Editing set ${setIndex + 1}` : `Set ${setIndex + 1} rest`
+  return set?.done ? `Editing set ${setIndex + 1}` : 'Rest'
 }
 
 export function exerciseSummary(names: string[]): string {

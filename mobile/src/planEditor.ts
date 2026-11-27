@@ -44,7 +44,7 @@ export function newPlanDraft(draftId: string, units: WeightUnits, template: Work
   const days = template?.days.length ? template.days.map((day) => ({
     rowId: newId(), ...(day.id ? { dayId: day.id } : {}), name: day.name,
     exercises: day.exercises.map((exercise) => {
-      const weight = String(kgToDisplayWeight(exercise.targetWeight, units))
+      const weight = exercise.targetWeight ? String(kgToDisplayWeight(exercise.targetWeight, units)) : ''
       return { ...exercise, rowId: newId(), sets: String(exercise.sets), targetReps: String(exercise.targetReps),
         weight, originalWeightKg: exercise.targetWeight, originalWeightDisplay: weight }
     }),
@@ -66,7 +66,7 @@ function numeric(text: string, maximum: number, whole: boolean, label: string): 
 // A pasted plan opens as a dirty new draft, so the journal keeps it, open lines included, across a restart.
 export function importedPlanDraft(plan: ImportedPlan, units: WeightUnits, newId: () => string): PlanDraft {
   const days = plan.days.map((day) => ({ rowId: newId(), dayId: newPlanDayId(), name: day.name, exercises: day.rows.map((row) => {
-    const weight = String(kgToDisplayWeight(row.targetWeight, units))
+    const weight = row.targetWeight ? String(kgToDisplayWeight(row.targetWeight, units)) : ''
     return { rowId: newId(), exerciseId: row.exercise?.exerciseId ?? '', exerciseSource: row.exercise?.exerciseSource ?? 'global' as const, name: row.name,
       sets: String(row.sets), targetReps: String(row.targetReps), weight, originalWeightKg: row.targetWeight, originalWeightDisplay: weight,
       detail: row.detail, check: row.check, ...(row.unmatched ? { unmatched: row.unmatched } : {}) }
@@ -92,7 +92,8 @@ export function normalizePlanDraft(draft: PlanDraft, operationId: string): PlanS
       const key = `${exercise.exerciseSource}:${exercise.exerciseId}`
       if (seen.has(key)) throw new Error('An exercise is already in this day.')
       seen.add(key)
-      const displayWeight = numeric(exercise.weight, draft.units === 'lbs' ? 4_409.25 : 2_000, false, 'weight')
+      // An empty weight field means no starting weight, saved as 0.
+      const displayWeight = exercise.weight.trim() ? numeric(exercise.weight, draft.units === 'lbs' ? 4_409.25 : 2_000, false, 'weight') : 0
       const converted = exercise.originalWeightDisplay === exercise.weight && exercise.originalWeightKg !== undefined
         ? String(exercise.originalWeightKg) : displayWeightStringToKg(String(displayWeight), draft.units)
       const sets = numeric(exercise.sets, 20, true, 'sets')

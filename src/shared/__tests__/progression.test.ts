@@ -126,7 +126,6 @@ describe('trialWeight', () => {
   it('makes the first set a test without a cap when the exercise has no history and no plan weight', () => {
     const fresh = run([], { target: { reps: 10, sets: 3, weight: 0 }, equipment: 'dumbbell' })!
     expect(fresh).toMatchObject({ weight: null, reps: 10, change: 'none', trial: { maxWeight: null }, step: 2 })
-    expect(progressionHintLabel(fresh, 'kg')).toBe('First set is a test')
     expect(trialWeight(fresh, { weight: 14, reps: 10 })).toBe(14)
     expect(trialWeight(fresh, { weight: 14, reps: 15 })).toBe(14)
     expect(trialWeight(fresh, { weight: 15, reps: 6 })).toBe(13)
@@ -170,9 +169,10 @@ describe('sessionHint', () => {
 
   it('proposes the weight for the rest from the first set of an exercise new to the plan', () => {
     const fresh = run([], { target: { reps: 8, sets: 3, weight: 0 } })
-    expect(sessionHint(fresh, sets(['', '8', false], ['', '8', false]), 'kg')).toEqual({ label: 'First set is a test' })
+    expect(sessionHint(fresh, sets(['', '8', false], ['', '8', false]), 'kg')).toBeNull()
     expect(sessionHint(fresh, sets(['50', '12', true], ['', '8', false]), 'kg')).toEqual({ label: 'From your first set: 52.5 kg', weight: 52.5 })
-    expect(sessionHint(fresh, sets(['50', '8', true], ['50', '8', false]), 'kg')).toEqual({ label: 'From your first set: 50 kg' })
+    // The open sets already carry the first set's weight, so a note would only repeat it.
+    expect(sessionHint(fresh, sets(['50', '8', true], ['50', '8', false]), 'kg')).toBeNull()
   })
 
   it('after a very long break takes the heaviest logged set as the scale, so a warm-up is not the test', () => {

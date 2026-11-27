@@ -658,15 +658,10 @@ export default function WorkoutDetailPage() {
         </motion.button>
 
         {workoutResult && !isEditing && (
-          <section className="workout-result-confirmation" aria-labelledby="workout-result-title">
-            <span className="workout-result-confirmation-icon" aria-hidden="true">
-              <Check size={18} strokeWidth={2.5} />
-            </span>
-            <div>
-              <h2 id="workout-result-title">Workout saved</h2>
-              <p>Your completed session is ready below.</p>
-            </div>
-          </section>
+          <h2 className="workout-result-saved">
+            <Check size={14} aria-hidden="true" />
+            Workout saved
+          </h2>
         )}
 
         <header className="workout-detail-session-head">
@@ -946,6 +941,12 @@ export default function WorkoutDetailPage() {
           >
             + Add exercise
           </motion.button>
+        )}
+
+        {workoutResult && !isEditing && (
+          <button type="button" className="planner-primary-action workout-result-done" onClick={handleBack}>
+            Done
+          </button>
         )}
       </div>
       <ExercisePicker

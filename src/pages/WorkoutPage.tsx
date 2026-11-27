@@ -45,7 +45,7 @@ import {
 import { useMobileInteraction } from '../components/MobileInteractionProvider'
 import { ElapsedSessionTimer } from '../components/ActiveWorkoutReturnBar'
 
-import { WORKOUT_LABELS, EQUIPMENT_LABELS, parseWeight, parseReps, focusExerciseIndex, nextGroupMember, panelSetIndex, removeSetMessage, restAfterSet, sessionBlocks, upNextQueue } from '../shared/workoutDisplay'
+import { WORKOUT_LABELS, EQUIPMENT_LABELS, parseWeight, parseReps, focusExerciseIndex, nextGroupMember, panelSetIndex, removeSetMessage, restAfterSet, sessionBlocks, setPanelRestLabel, upNextQueue } from '../shared/workoutDisplay'
 import { catalogueMeta, sessionRoles } from '../shared/nextSessionRecommendation'
 
 type PendingSetRemoval = { exerciseClientId: string; setClientId: string; done: boolean }
@@ -55,10 +55,10 @@ interface RestTimerBarProps {
   onAddTime: (deltaSec: number) => void
   onSkip: () => void
   variant?: 'full' | 'compact'
-  next: string
+  label: string
 }
 
-function RestTimerBar({ rest, onAddTime, onSkip, variant = 'full', next }: RestTimerBarProps) {
+function RestTimerBar({ rest, onAddTime, onSkip, variant = 'full', label }: RestTimerBarProps) {
   const [now, setNow] = useState(() => Date.now())
   const firedRef = useRef(false)
   const onSkipRef = useRef(onSkip)
@@ -108,11 +108,10 @@ function RestTimerBar({ rest, onAddTime, onSkip, variant = 'full', next }: RestT
             <span>Ready — time for the next set</span>
           ) : (
             <>
-              <span style={{ color: 'var(--muted)' }}>Rest</span>
+              <span style={{ color: 'var(--muted)' }}>{label}</span>
               <span className="rest-timer-value tabular-nums">
                 {Math.floor(restRemainingSec / 60)}:{String(restRemainingSec % 60).padStart(2, '0')}
               </span>
-              <small className="rest-timer-next">then {next}</small>
             </>
           )}
         </div>
@@ -905,7 +904,7 @@ export default function WorkoutPage() {
           onAddTime={handleAddRestTime}
           onSkip={handleSkipRest}
           variant={isDesktop ? 'full' : mobileRestVariant}
-          next={panelSet ? panelTitle : nextExerciseIndex >= 0 ? active.exercises[nextExerciseIndex]?.name ?? 'the next exercise' : 'Finish'}
+          label={setPanelRestLabel(panelSet, currentSetIndex)}
         />
       ) : null}
       onAdjustSet={handleAdjustSet}

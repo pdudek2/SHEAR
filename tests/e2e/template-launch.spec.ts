@@ -54,12 +54,13 @@ async function createLaunchTemplate(page: Page, templateName: string): Promise<v
   await page.getByPlaceholder('E.g. Upper / Lower 4 days').fill(templateName)
   await openExercisePicker(page)
 
-  const picker = page.getByRole('dialog', { name: 'Add exercise' })
+  const picker = page.getByRole('dialog', { name: 'Add exercises' })
   await expect(picker).toBeVisible({ timeout: 5_000 })
   await page.getByPlaceholder('Search exercises').fill('Squat')
   const squat = picker.locator('button').filter({ hasText: /squat/i }).first()
   await expect(squat).toBeVisible({ timeout: 5_000 })
   await squat.click()
+  await picker.getByRole('button', { name: 'Add 1 exercise' }).click()
   await expect(picker).not.toBeVisible({ timeout: 5_000 })
 
   await page.getByRole('button', { name: 'Save plan' }).click()

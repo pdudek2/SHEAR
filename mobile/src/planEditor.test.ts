@@ -13,11 +13,12 @@ test('normalizes source identity and refuses malformed numeric input', () => {
   draft.name = ' Day split '
   draft.days[0]!.exercises = [
     { ...exercise('global'), rowId: 'global', sets: '4', targetReps: '8', weight: '220.5' },
-    { ...exercise('user'), rowId: 'user', sets: '3', targetReps: '0', weight: '0' },
+    { ...exercise('user'), rowId: 'user', sets: '3', targetReps: '0', weight: '' },
   ]
   const request = normalizePlanDraft(draft, 'operation-1')
   assert.equal(request.days[0]!.exercises.length, 2)
   assert.equal(request.days[0]!.exercises[0]!.targetWeight, 100.0171)
+  assert.equal(request.days[0]!.exercises[1]!.targetWeight, 0, 'an empty weight field saves as no starting weight')
   assert.equal(request.name, 'Day split')
   draft.days[0]!.exercises[0]!.weight = '220lbs'
   assert.throws(() => normalizePlanDraft(draft, 'operation-1'), /weight/)

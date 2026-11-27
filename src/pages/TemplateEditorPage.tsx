@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import ExercisePicker from '../components/ExercisePicker'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -30,6 +30,8 @@ import {
 import { pluralize } from '../lib/pluralize'
 import { ApiRejectedError } from '../lib/authedApi'
 import { newPlanDayId } from '../shared/planDay'
+import { picksForDay, type ExercisePick } from '../shared/exercisePicks'
+import { MAX_SESSION_EXERCISES } from '../shared/workoutLimits'
 import { acceptSetInput } from '../shared/setInput'
 import { createUserExercise, type UserExerciseInput } from '../lib/userExercisesService'
 import { CHECK_HINT, unmatchedHint, type ImportedPlan, type ImportedRow } from '../shared/planImport'
@@ -316,29 +318,16 @@ export default function TemplateEditorPage() {
     document.getElementById(`template-day-tab-${nextDay._id}`)?.focus()
   }
 
-  function addExerciseToDay(dayIndex: number, exerciseId: string, exerciseName: string, source: ExerciseSource) {
+  function addExercisesToDay(dayIndex: number, picks: ExercisePick[]) {
     // Checked before the update: a state updater may run twice and must not show the toast itself.
-    if (days[dayIndex]?.exercises.some((exercise) => exercise.exerciseId === exerciseId && exercise.exerciseSource === source)) {
-      toast.message('This exercise is already in this day.')
-      return
-    }
-    setDays((prev) => prev.map((day, index) => {
-      if (index !== dayIndex) return day
-
-      return {
-        ...day,
-        exercises: [
-          ...day.exercises,
-          {
-            exerciseId,
-            exerciseSource: source,
-            name: exerciseName,
-            sets: 4,
-            targetReps: 8,
-            targetWeight: 0,
-          },
-        ],
-      }
+    const { added, skipped } = picksForDay(days[dayIndex]?.exercises ?? [], picks, MAX_SESSION_EXERCISES)
+    if (skipped > 0) toast.message(added.length ? 'Some exercises were already in this day or over its limit.' : 'These exercises are already in this day.')
+    setDays((prev) => prev.map((day, index) => index !== dayIndex ? day : {
+      ...day,
+      exercises: [
+        ...day.exercises,
+        ...added.map(({ exerciseId, name, source }) => ({ exerciseId, exerciseSource: source, name, sets: 4, targetReps: 8, targetWeight: 0 })),
+      ],
     }))
     setPickerDayIndex(null)
   }
@@ -703,6 +692,7 @@ export default function TemplateEditorPage() {
                             inputMode="decimal"
                             min={0}
                             step={units === 'lbs' ? '0.1' : '0.5'}
+                            placeholder="—"
                             value={exercise.targetWeight === 0 ? '' : kgToDisplayWeight(exercise.targetWeight, units)}
                             onChange={(event) => acceptSetInput(event.target.value, exercise.targetWeight === 0 ? '' : String(kgToDisplayWeight(exercise.targetWeight, units)), 'weight', units)
                               && updateExercise(selectedDayIndex, exerciseIndex, (current) => ({
@@ -760,7 +750,6 @@ export default function TemplateEditorPage() {
                   className="planner-primary-action template-editor-desktop-save disabled:opacity-60"
                   whileTap={{ scale: 0.97 }}
                 >
-                  <Pencil size={15} />
                   {saveState === 'saving'
                     ? 'Saving…'
                     : 'Save plan'}
@@ -805,7 +794,8 @@ export default function TemplateEditorPage() {
         userExercisesState={userExercisesState}
         onRetryUserExercises={retryUserExercises}
         onClose={() => setPickerDayIndex(null)}
-        onSelect={(exerciseId, exerciseName, source) => { if (pickerDayIndex !== null) addExerciseToDay(pickerDayIndex, exerciseId, exerciseName, source) }}
+        onSelect={() => undefined}
+        onSelectMany={(picks) => { if (pickerDayIndex !== null) addExercisesToDay(pickerDayIndex, picks) }}
       />
 
       {leaveGuard.blocked && (

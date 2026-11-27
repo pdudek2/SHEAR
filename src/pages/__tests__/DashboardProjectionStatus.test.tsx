@@ -312,13 +312,15 @@ describe('Dashboard workout projection status', () => {
     expect(screen.queryByText(/Push day/)).not.toBeInTheDocument()
   })
 
-  it('keeps the empty week summary compact for a new account', async () => {
+  it('leaves the empty week out for a new account with no plans and no workouts', async () => {
     mocks.getRecentWorkouts.mockResolvedValue([])
 
     render(<DashboardPage />)
 
-    expect(await screen.findByText('0 of 3')).toBeInTheDocument()
-    expect(screen.getByLabelText('Days of the current week').children).toHaveLength(7)
+    expect(await screen.findByText('No plans yet')).toBeInTheDocument()
+    expect(screen.getByText('Paste the plan from your notes, start from ours, or build your own.')).toBeInTheDocument()
+    expect(screen.queryByText('0 of 3')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Plans' })).not.toBeInTheDocument()
   })
 
   it('uses the same compact goal summary when a returning user has an empty week', async () => {

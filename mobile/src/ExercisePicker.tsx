@@ -7,6 +7,7 @@ import { exercises as exerciseDb, rankByQuery, searchExercises, type Category } 
 import { EXERCISE_CATEGORY_LABELS, getEquipmentLabel } from '../../src/lib/exerciseLabels'
 import type { RecentExercisePick } from '../../src/shared/recentExercises'
 import type { ExerciseRef } from '../../src/shared/exerciseMatch'
+import { togglePick, type ExercisePick } from '../../src/shared/exercisePicks'
 import { BottomSheet } from './BottomSheet'
 import { KeyboardLift } from './KeyboardLift'
 import type { ExerciseSource } from './session'
@@ -20,7 +21,7 @@ const PICKER_CATEGORIES: { value: Category | 'all'; label: string }[] = [
 
 type PickerResult = { id: string; name: string; category: string; equipment: string; source: ExerciseSource }
 
-export default function ExercisePicker({ userExercises, recent = [], suggestions = [], title = 'Add exercise', onRetryUserExercises, onSelect, onClose }: {
+export default function ExercisePicker({ userExercises, recent = [], suggestions = [], onSelectMany, title = onSelectMany ? 'Add exercises' : 'Add exercise', onRetryUserExercises, onSelect, onClose }: {
   userExercises: ReadState<ExerciseMetadata[]>
   recent?: RecentExercisePick[]
   // Closest matches for a pasted line, listed first.
@@ -28,9 +29,12 @@ export default function ExercisePicker({ userExercises, recent = [], suggestions
   title?: string
   onRetryUserExercises: () => void
   onSelect: (id: string, name: string, source: ExerciseSource) => void
+  // With it, taps tick exercises and one button adds them all, in tap order.
+  onSelectMany?: (picks: ExercisePick[]) => void
   onClose: () => void
 }) {
   const insets = useSafeAreaInsets()
+  const [picks, setPicks] = useState<ExercisePick[]>([])
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<Category | 'all'>('all')
   const list = useRef<FlatList<PickerResult>>(null)
@@ -52,8 +56,12 @@ export default function ExercisePicker({ userExercises, recent = [], suggestions
     return exercise ? [{ ...exercise, source: ref.exerciseSource }] : []
   })
   return <BottomSheet tall title={title} onClose={onClose}>{(close) => {
-    const row = (item: PickerResult) => <Pressable key={`${item.source}-${item.id}`} accessibilityRole="button" accessibilityLabel={`${item.name}${item.source === 'user' ? ', mine' : ''}`}
-      onPress={() => close(() => onSelect(item.id, item.name, item.source))} style={({ pressed }) => [styles.pickerResult, pressed && styles.pickerPressed]}>
+    const picked = (item: PickerResult) => picks.some((pick) => pick.exerciseId === item.id && pick.source === item.source)
+    const row = (item: PickerResult) => <Pressable key={`${item.source}-${item.id}`} accessibilityRole={onSelectMany ? 'checkbox' : 'button'} accessibilityState={onSelectMany ? { checked: picked(item) } : undefined}
+      accessibilityLabel={`${item.name}${item.source === 'user' ? ', mine' : ''}`}
+      onPress={() => onSelectMany ? setPicks((current) => togglePick(current, { exerciseId: item.id, name: item.name, source: item.source })) : close(() => onSelect(item.id, item.name, item.source))}
+      style={({ pressed }) => [styles.pickerResult, pressed && styles.pickerPressed]}>
+      {onSelectMany && <View style={[styles.pickerCheck, picked(item) && styles.pickerCheckOn]}>{picked(item) && <Svg width={14} height={14} viewBox="0 0 24 24"><Path d="M20 6 9 17l-5-5" fill="none" stroke={colors.onPrimary} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /></Svg>}</View>}
       <View style={styles.pickerResultMain}>
         <Text numberOfLines={1} style={styles.pickerResultName}>{item.name}</Text>
         {item.source === 'user' && <Text style={styles.pickerMine}>mine</Text>}
@@ -99,7 +107,12 @@ export default function ExercisePicker({ userExercises, recent = [], suggestions
           <Text style={styles.pickerEmptyCopy}>{category === 'all' ? 'Try a shorter name, like “curl”, or clear the search.' : 'Change your search or choose All.'}</Text>
         </View> : null}
         renderItem={({ item }) => row(item)}
+        extraData={picks}
       />
+      {onSelectMany && picks.length > 0 && <Pressable accessibilityRole="button" onPress={() => close(() => onSelectMany(picks))}
+        style={({ pressed }) => [styles.pickerAdd, { marginBottom: Math.max(16, insets.bottom + 8) }, pressed && styles.pickerPressed]}>
+        <Text style={styles.pickerAddText}>Add {picks.length} {picks.length === 1 ? 'exercise' : 'exercises'}</Text>
+      </Pressable>}
     </>
   }}</BottomSheet>
 }
@@ -125,6 +138,10 @@ const styles = StyleSheet.create({
   pickerResultMain: { alignItems: 'baseline', flex: 1, flexDirection: 'row', gap: 8.8 },
   pickerResultName: { color: colors.text, flexShrink: 1, fontFamily: 'InstrumentSans_400Regular', fontSize: 15 },
   pickerMine: { color: colors.accentText, fontFamily: 'InstrumentSans_700Bold', fontSize: 11 },
+  pickerCheck: { alignItems: 'center', borderColor: colors.mutedSoft, borderRadius: 6, borderWidth: 1.5, height: 20, justifyContent: 'center', width: 20 },
+  pickerCheckOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  pickerAdd: { alignItems: 'center', backgroundColor: colors.primaryStart, borderRadius: 15, justifyContent: 'center', marginTop: 10, minHeight: 50 },
+  pickerAddText: { color: colors.onPrimary, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 16 },
   pickerEmpty: { alignItems: 'center', gap: 5.6, justifyContent: 'center', minHeight: 208 },
   pickerEmptyTitle: { color: colors.textStrong, fontFamily: 'InstrumentSans_700Bold', fontSize: 16 },
   pickerEmptyCopy: { color: colors.muted, fontFamily: 'InstrumentSans_400Regular', fontSize: 13.12, textAlign: 'center' },

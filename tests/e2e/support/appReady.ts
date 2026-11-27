@@ -46,7 +46,8 @@ export async function expectAppReady(
       await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible({ timeout })
       return
     case '/dashboard':
-      await expect(page.locator('.train-days')).toBeVisible({ timeout })
+      // A new account has no week strip, so the loaded title is the ready signal.
+      await expect(page.locator('.train-title')).toHaveText(/\S/, { timeout })
       await expect(page.getByText('Could not load the dashboard', { exact: true })).toHaveCount(0)
       return
     case '/history':

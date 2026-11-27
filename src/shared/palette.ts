@@ -17,6 +17,8 @@ export const palette = {
   mutedSoft: '#94897f',
   line: 'rgba(244, 238, 232, 0.12)',
   lineStrong: 'rgba(244, 238, 232, 0.2)',
+  // About 3:1 on the background: the unfilled part of a slider stays visible.
+  track: 'rgba(148, 137, 127, 0.6)',
   selected: '#3a342f',
   warning: '#f0a75a',
   warningForeground: '#221307',
@@ -38,6 +40,7 @@ const cssVariables: Record<string, keyof typeof palette> = {
   '--text-strong': 'textStrong',
   '--muted': 'muted',
   '--muted-soft': 'mutedSoft',
+  '--track': 'track',
   '--border': 'line',
   '--border-strong': 'lineStrong',
   '--puls-warning': 'warning',

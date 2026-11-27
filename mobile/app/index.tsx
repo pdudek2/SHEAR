@@ -282,17 +282,19 @@ function TimeLine({ session, onOpen }: { session: ActiveWorkout; onOpen: () => v
 }
 
 
-function SetValueInput({ value, units, field, label, rejectedEdit, inputRef, onChange }: {
+function SetValueInput({ value, units, field, label, unit, rejectedEdit, inputRef, onChange }: {
   value: string
   units: Units
   field: 'weight' | 'reps'
   label: string
+  unit: string
   rejectedEdit: object | null
   inputRef?: React.Ref<TextInput>
   onChange: (value: string) => void
 }) {
   const displayed = storedValueToSetInput(value, field, units)
   const [text, setText] = useState(displayed)
+  const [typing, setTyping] = useState(false)
   const focused = useRef(false)
   const pendingSubmissions = useRef<string[]>([])
   const inputUnits = useRef(units)
@@ -310,13 +312,14 @@ function SetValueInput({ value, units, field, label, rejectedEdit, inputRef, onC
       setText(displayed)
     }
   }, [displayed, value, rejectedEdit, units])
-  return <TextInput
+  return <><TextInput
     ref={inputRef}
     accessibilityLabel={label}
     inputMode={field === 'weight' ? 'decimal' : 'numeric'}
     keyboardType={field === 'weight' ? 'decimal-pad' : 'number-pad'}
     onBlur={() => {
       focused.current = false
+      setTyping(false)
       if (pendingSubmissions.current.length === 0) setText(displayed)
     }}
     onChangeText={(next) => {
@@ -327,14 +330,17 @@ function SetValueInput({ value, units, field, label, rejectedEdit, inputRef, onC
       pendingSubmissions.current.push(canonical)
       onChange(canonical)
     }}
-    onFocus={() => { focused.current = true }}
+    onFocus={() => {
+      focused.current = true
+      setTyping(true)
+    }}
     placeholder={field === 'weight' ? '–' : '0'}
     placeholderTextColor={colors.mutedSoft}
     selectTextOnFocus
     {...fieldColors}
     style={styles.panelInput}
     value={text}
-  />
+  /><Text style={[styles.panelUnit, typing && styles.panelUnitTyping]}>{unit}</Text></>
 }
 
 interface EditingActions {
@@ -756,14 +762,14 @@ function SetPanel({ exercise, setIndex, member, units, rejectedEdit, editing, re
       <View style={styles.panelNum}>
         <SetStepper label="weight" step={-weightStep(units)} onStep={() => adjust('weight', displayWeightDeltaToKg(-weightStep(units), units))} />
         <View style={styles.panelValue}><SetValueInput key={`${set.clientId}:weight`} rejectedEdit={rejectedEdit} value={set.weight} units={units} field="weight" inputRef={weightRef}
-          label={`Weight, ${exercise.name}, set ${number}, ${units}`} onChange={(value) => editing.updateSet(exercise.clientId, set.clientId, 'weight', value)} /><Text style={styles.panelUnit}>{units}</Text></View>
+          label={`Weight, ${exercise.name}, set ${number}, ${units}`} unit={units} onChange={(value) => editing.updateSet(exercise.clientId, set.clientId, 'weight', value)} /></View>
         <SetStepper label="weight" step={weightStep(units)} onStep={() => adjust('weight', displayWeightDeltaToKg(weightStep(units), units))} />
       </View>
       <View style={styles.panelDivider} />
       <View style={styles.panelNum}>
         <SetStepper label="reps" step={-1} onStep={() => adjust('reps', -1)} />
         <View style={styles.panelValue}><SetValueInput key={`${set.clientId}:reps`} rejectedEdit={rejectedEdit} value={set.reps} units={units} field="reps"
-          label={`Reps, ${exercise.name}, set ${number}`} onChange={(value) => editing.updateSet(exercise.clientId, set.clientId, 'reps', value)} /><Text style={styles.panelUnit}>reps</Text></View>
+          label={`Reps, ${exercise.name}, set ${number}`} unit="reps" onChange={(value) => editing.updateSet(exercise.clientId, set.clientId, 'reps', value)} /></View>
         <SetStepper label="reps" step={1} onStep={() => adjust('reps', 1)} />
       </View>
     </View>}
@@ -1452,7 +1458,9 @@ const styles = StyleSheet.create({
   panelDivider: { backgroundColor: colors.line, height: 44, width: 1 },
   panelValue: { alignItems: 'center', flex: 1, minWidth: 0 },
   panelInput: { color: colors.textStrong, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 21, fontVariant: ['tabular-nums'], letterSpacing: -0.42, minHeight: 44, minWidth: 0, padding: 0, textAlign: 'center', width: '100%' },
-  panelUnit: { color: colors.muted, fontFamily: 'InstrumentSans_500Medium', fontSize: 12, marginTop: -10 },
+  // The hairline between value and unit marks the value as typeable; it brightens while typing.
+  panelUnit: { borderTopColor: colors.lineStrong, borderTopWidth: 1, color: colors.muted, fontFamily: 'InstrumentSans_500Medium', fontSize: 12, marginTop: -10, minWidth: 44, paddingTop: 2, textAlign: 'center' },
+  panelUnitTyping: { borderTopColor: colors.text },
   panelStep: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.09)', borderRadius: 12, boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05)', height: 52, justifyContent: 'center', width: 48 },
   panelStepText: { color: colors.text, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 13, fontVariant: ['tabular-nums'] },
   panelAction: { alignItems: 'center', backgroundColor: colors.primaryEnd, borderRadius: 15, boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35)', experimental_backgroundImage: primaryGradient, height: 52, justifyContent: 'center' },

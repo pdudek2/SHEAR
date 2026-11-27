@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import ReadinessWidget from '../components/ReadinessWidget'
 import { TodayExercises, TrainTime } from '../components/TrainToday'
@@ -48,7 +48,7 @@ import { latestRecord, recordLine } from '../shared/workoutMoments'
 import { templateStartWeight } from '../shared/workoutDisplay'
 import { loadTemplateExerciseHistory } from '../lib/templateLaunchService'
 import { WORKOUT_COVERS, workoutCover } from '../shared/workoutCover'
-import { WEEK_LABELS, addLocalDays, getGreeting, getWeekDates, nextPlanWorkout, weekdayLabel } from '../shared/week'
+import { WEEK_LABELS, addLocalDays, getGreeting, getWeekDates, nextPlanWorkout, weekdayLabel, workoutToday } from '../shared/week'
 import PastePlanSheet from '../components/PastePlanSheet'
 import { useStarterPlan } from '../hooks/useStarterPlan'
 import { readLandingPlan } from '../lib/landingPlanStorage'
@@ -637,6 +637,8 @@ export default function DashboardPage() {
 
   // Picking a workout means the next session matters more than the finished week.
   const weekClosed = !plansLoading && !hasActiveSession && !workoutPicked && weeklyDone >= weeklyGoal
+  // After today's workout the plan's next day is what comes next, not a second session today.
+  const doneToday = !plansLoading && !hasActiveSession && !weekClosed && quickTemplateDay ? workoutToday(workouts, today) : null
   const sessionLabel = active ? active.label?.trim() || 'Workout' : null
   const coverName = active ? workoutCover(active.label) : weekClosed ? 'week' : workoutCover(quickTemplateDay?.name ?? quickTemplate?.name)
   const record = latestRecord(workouts, today.getTime())
@@ -721,6 +723,7 @@ export default function DashboardPage() {
             <div className="train-cover-copy">
               <p className="train-date">
                 {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+                {doneToday && ' · Up next'}
               </p>
               <h1 className="train-title">
                 {plansLoading
@@ -736,6 +739,12 @@ export default function DashboardPage() {
                 : quickTemplate && quickTemplateDay
                 ? <p className="train-meta">{quickTemplate.name} · Day {quickTemplateDayIndex + 1} of {quickTemplate.days.length}</p>
                 : supportLine && <p className="train-meta">{supportLine}</p>}
+              {doneToday && (
+                <p className="train-done">
+                  <Check size={14} aria-hidden="true" />
+                  Done today: {workoutTitle(doneToday)} · {doneToday.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0)} sets
+                </p>
+              )}
             </div>
             {record && <i className="train-record-seam" aria-hidden="true" />}
           </motion.div>
@@ -805,7 +814,7 @@ export default function DashboardPage() {
                   {workoutSelection.unavailable
                     ? 'Choose another workout before starting.'
                     : noPlans
-                      ? landingPlan ? 'The plan you pasted is ready. Check it, then save it.' : 'Paste the plan you already follow, or start from ours.'
+                      ? landingPlan ? 'The plan you pasted is ready. Check it, then save it.' : 'Paste the plan from your notes, start from ours, or build your own.'
                       : 'You can still start an empty workout.'}
                 </span>
                 {templatesState.status === 'error' && (
@@ -836,7 +845,7 @@ export default function DashboardPage() {
             {!isDesktop && dock}
 
             <div className="train-links">
-              <button type="button" className="train-link" onClick={() => navigate('/templates')}>Plans</button>
+              {!noPlans && <button type="button" className="train-link" onClick={() => navigate('/templates')}>Plans</button>}
               {!hasActiveSession && templatesState.status === 'success' && templates.some((template) => template.days.some((day) => day.exercises.length > 0)) && (
                 <button
                   type="button"
@@ -861,7 +870,8 @@ export default function DashboardPage() {
           </div>
 
           <div className="train-side">
-            <motion.div className="train-week" {...fadeUp(0.09)}>
+            {/* An account with no plans and no workouts has an empty week to show; the way in matters more. */}
+            {!(noPlans && workouts.length === 0) && <motion.div className="train-week" {...fadeUp(0.09)}>
               <div className="train-week-head">
                 <h2>This week</h2>
                 <span>
@@ -888,7 +898,7 @@ export default function DashboardPage() {
                   ))}
                 </dl>
               </details>
-            </motion.div>
+            </motion.div>}
             {isDesktop && dock}
           </div>
         </section>

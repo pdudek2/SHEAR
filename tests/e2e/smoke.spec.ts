@@ -26,7 +26,6 @@ test('mobile nav shows four usable primary items at 360px and 390px', async ({ p
 
   await page.goto('/dashboard')
   await expectAppReady(page, '/dashboard')
-  await expect(page.getByRole('heading', { name: 'This week' })).toBeVisible()
   const nav = page.getByLabel('Bottom navigation')
   await expect(nav).toBeVisible()
 
@@ -86,10 +85,10 @@ test('bottom nav active state updates on navigation', async ({ page, isMobile })
   await nav.getByRole('button', { name: 'Progress', exact: true }).click()
   await page.waitForURL('/progress')
 
-  // Navigate to Templates through Train
+  // Plans belongs to Train; an account without plans has no Plans link there, so it opens directly
   await nav.getByRole('button', { name: 'Train', exact: true }).click()
   await page.waitForURL('/dashboard')
-  await page.getByRole('button', { name: 'Plans', exact: true }).click()
+  await page.goto('/templates')
   await page.waitForURL('/templates')
   await expect(nav.locator('[aria-current="page"]')).toHaveCount(1)
   await expect(nav.getByRole('button', { name: 'Train', exact: true })).toHaveAttribute('aria-current', 'page')

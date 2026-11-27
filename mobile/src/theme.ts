@@ -10,6 +10,7 @@ export const colors = {
   surfaceHigh: palette.surfaceHigh,
   line: palette.line,
   lineStrong: palette.lineStrong,
+  track: palette.track,
   text: palette.text,
   textStrong: palette.textStrong,
   muted: palette.muted,
