@@ -202,7 +202,6 @@ describe("today's launch on the Upper day", () => {
       expect(today(days).record).toMatchObject({ mode: 'readiness', breakDays: days, readiness: null })
     }
     expect(sets(today(29))).toEqual([2, 2, 2, 2, 2, 2])
-    expect(today(100).exercises.every((exercise) => exercise.trial)).toBe(true)
     expect(sets(today(20, {}, low))).toEqual([3, 2, 2, 2, 2, 2])
     expect(sets(today(40, {}, low))).toEqual([2, 2, 2, 2, 2, 2])
     const short = today(40, { budgetMin: 30 })
@@ -232,7 +231,7 @@ describe("today's launch on the Upper day", () => {
     firstBack.exercises[0]!.sets = firstBack.exercises[0]!.sets.map((set) => ({ ...set, reps: 12 }))
     const next = buildNextSessionRecommendation(upper, 0, null, [firstBack], NOW, 'kg', day)
     expect(next).toMatchObject({ breakDays: null, record: null })
-    expect(next.exercises[0]).toMatchObject({ sets: 4, weightDelta: 0, trial: false })
+    expect(next.exercises[0]).toMatchObject({ sets: 4, weightDelta: 0 })
   })
 })
 

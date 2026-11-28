@@ -108,8 +108,6 @@ export interface NextSessionExercise {
   weight: number
   setsDelta: number
   weightDelta: number
-  // The first set is a test after a long break (progression engine, rule 6).
-  trial: boolean
 }
 
 export interface NextSessionRecommendation {
@@ -236,7 +234,6 @@ export function buildNextSessionRecommendation(
       weight,
       setsDelta,
       weightDelta,
-      trial: progression?.trial != null,
     }
   })
 

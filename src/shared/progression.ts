@@ -200,12 +200,14 @@ export function sessionHint(progression: Progression | null, sets: SessionSet[],
   const label = progressionHintLabel(progression, units, equipment)
 
   if (progression.trial) {
+    // Without a weight to apply or a number in it, the trial note would only announce itself.
+    const told = label !== null && progression.weight !== null && progression.delta < 0
     const done = sets.filter((set) => set.done).map((set) => ({ weight: Number.parseFloat(set.weight) || 0, reps: Number.parseInt(set.reps, 10) || 0 }))
-    if (!done.length) return label === null ? null : progression.weight !== null && differs('weight', progression.weight) ? { label, weight: progression.weight } : { label }
+    if (!done.length) return label === null ? null : progression.weight !== null && differs('weight', progression.weight) ? { label, weight: progression.weight } : told ? { label } : null
     // The heaviest logged set sets the scale, so a warm-up never counts as the test.
     const reference = progression.weight ?? Math.max(...done.map((set) => set.weight))
     const test = done.find((set) => set.weight >= reference * 0.8)
-    if (!test) return progression.ceiling > 3 && label !== null ? { label } : null
+    if (!test) return progression.ceiling > 3 && told ? { label } : null
     const weight = trialWeight(progression, test, units)
     if (weight === null) return null
     return differs('weight', weight) ? { label: trialHintLabel(weight, units, equipment), weight } : null

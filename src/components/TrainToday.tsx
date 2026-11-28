@@ -29,9 +29,6 @@ export function TrainTime({ today, plannedSets, budgetMin, straight, fullSets, o
   const kept = compression.sets.reduce((sum, sets) => sum + sets, 0)
   const grouped = compression.blocks.some((block) => block.group && block.items.filter((item) => item.sets > 0).length > 1)
 
-  // After a break the start weights stay the usual day's and the session's first set tests them.
-  const weights = today.breakDays !== null && today.exercises.some((exercise) => exercise.trial) ? 'First set is a test' : 'Same weights'
-
   return (
     <div className="train-dock-today train-today">
       {today.breakDays !== null && (
@@ -55,7 +52,7 @@ export function TrainTime({ today, plannedSets, budgetMin, straight, fullSets, o
         </p>
       ) : today.record ? (
         <p className="train-dock-line">
-          <strong>{approx}{minutes(compression.estimateSec)} min</strong>{' · '}{kept} of {plannedSets} sets{' · '}{today.tone === 'low' && !fullSets ? 'rough day' : weights}
+          <strong>{approx}{minutes(compression.estimateSec)} min</strong>{' · '}{kept} of {plannedSets} sets{' · '}{today.tone === 'low' && !fullSets ? 'rough day' : 'Same weights'}
         </p>
       ) : (
         <p className="train-dock-line">

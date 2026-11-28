@@ -43,7 +43,7 @@ test.describe('Return after a break', () => {
     await page.getByRole('button', { name: 'Use the starter plan' }).click()
     const dock = page.getByRole('main')
     await expect(dock.getByText(/^\d+ days since your last workout · fewer sets today$/)).toBeVisible({ timeout: 15_000 })
-    await expect(dock.getByText(/First set is a test/)).toBeVisible()
+    await expect(dock.getByText(/First set is a test/)).toHaveCount(0)
     const line = dock.getByText(/ of \d+ sets/)
     const [kept, planned] = (await line.textContent())!.match(/(\d+) of (\d+) sets/)!.slice(1).map(Number)
     expect(kept).toBeLessThan(planned!)

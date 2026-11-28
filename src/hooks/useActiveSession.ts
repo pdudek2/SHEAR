@@ -749,13 +749,20 @@ export function useActiveSession(uid: string | null) {
     }
 
     const handlePageHide = () => flushPendingSession()
+    // A save that failed offline is otherwise only sent again with the next change or a reload.
+    // Only this tab's own unsent edits: the backup flag is shared by every open tab.
+    const handleOnline = () => {
+      if (hasUnsyncedLocalChangesRef.current && readActiveSessionBackupRecord(currentUid)?.unsynced !== false) flushPendingSession()
+    }
     window.addEventListener('pagehide', handlePageHide)
+    window.addEventListener('online', handleOnline)
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       if (hasUnsyncedLocalChangesRef.current) flushPendingSession(true)
       unsubscribeRemote()
       unsubscribe()
       window.removeEventListener('pagehide', handlePageHide)
+      window.removeEventListener('online', handleOnline)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       if (sessionWriteGenerationRef.current === sessionWriteGeneration) {
         sessionWriteGenerationRef.current += 1

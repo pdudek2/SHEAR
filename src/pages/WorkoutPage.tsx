@@ -932,7 +932,7 @@ export default function WorkoutPage() {
       units,
       exerciseMeta?.equipment,
     )
-    // A trial announces itself and then proposes a weight; dismissing one must not hide the next.
+    // The hint can change after the first set; dismissing one must not hide the next.
     return { hint, hintKey: `${historyKey}|${hint?.label ?? ''}` }
   }
   const ledgerItem = (exercise: WorkoutExercise, index: number) => {

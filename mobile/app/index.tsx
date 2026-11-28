@@ -421,7 +421,7 @@ function MoreButton({ label, onPress }: { label: string; onPress: () => void }) 
 function ProgressionHint({ history, exercise, metadata, target, lowReadiness, units, editing }: {
   history: HistoryRead; exercise: WorkoutExercise; metadata: ExerciseMetadata | undefined; target: ProgressionInput['target'] | undefined; lowReadiness: boolean; units: Units; editing: EditingActions
 }) {
-  // A trial announces itself and then proposes a weight; closing one must not hide the next.
+  // The hint can change after the first set; closing one must not hide the next.
   const [closedHint, setClosedHint] = useState<string | null>(null)
   const progression = history.state.status === 'ready' && target !== undefined ? buildProgression({
     sessions: history.state.data.sessions, target, equipment: metadata?.equipment, category: metadata?.category, units, lowReadiness, now: Date.now(),
