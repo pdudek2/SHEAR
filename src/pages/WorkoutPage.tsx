@@ -322,18 +322,24 @@ export default function WorkoutPage() {
         if (inToast) (document.activeElement as HTMLElement).blur()
         document.querySelector<HTMLInputElement>('.workout-set-panel input[role="spinbutton"]')?.focus()
       }
+      // A question waits for its answer; a timed toast vanished before slower readers could tap it
       if (unweighted) toast('No weight entered. Log this set without weight?', {
         id: 'log-without-weight',
+        duration: Infinity,
         action: { label: 'Log without weight', onClick: logAnyway },
         cancel: { label: 'Enter weight', onClick: enterWeight },
       })
       else if (slip) toast(`${slip.title} ${slip.message}`, {
         id: 'log-weight-slip',
+        duration: Infinity,
         action: { label: 'Log anyway', onClick: logAnyway },
         cancel: { label: 'Fix', onClick: enterWeight },
       })
       return
     }
+    // A question left unanswered must not outlive the set it asked about
+    toast.dismiss('log-without-weight')
+    toast.dismiss('log-weight-slip')
     toggleSetDone(exerciseIndex, setIndex)
     if (wasNotDone) {
       const next = useWorkoutStore.getState().active

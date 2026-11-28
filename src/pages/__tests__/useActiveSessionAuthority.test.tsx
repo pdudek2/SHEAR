@@ -30,6 +30,7 @@ const discardStaleSessionLifecycle = vi.hoisted(() => vi.fn())
 
 vi.mock('../../lib/activeSessionService', () => ({
   ActiveSessionConflictError,
+  attemptedRevisionOf: (error: unknown) => (error instanceof Error && error.message === 'offline' ? 'revision-lost-answer' : null),
   claimActiveSession,
   loadActiveSessionFromServer,
   saveActiveSession,
@@ -285,6 +286,8 @@ describe('useActiveSession snapshot authority', () => {
     expect(saveActiveSession).toHaveBeenCalledTimes(2)
     expect(saveActiveSession.mock.calls[1][1].exercises[0].sets[0].reps).toBe('7')
     expect(saveActiveSession.mock.calls[1][2]).toBe('revision-initial')
+    // The lost first attempt may have landed: the resend may overwrite it
+    expect(saveActiveSession.mock.calls[1][3]).toEqual(['revision-lost-answer'])
 
     await act(async () => {
       window.dispatchEvent(new Event('online'))

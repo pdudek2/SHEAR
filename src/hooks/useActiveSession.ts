@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { stripWorkoutClientIds, useWorkoutStore, type ActiveWorkout } from '../store/workoutStore'
 import {
   ActiveSessionConflictError,
+  attemptedRevisionOf,
   claimActiveSession,
   loadActiveSessionFromServer,
   saveActiveSession,
@@ -58,7 +59,8 @@ const IGNORED_STALE_SESSION_OPERATION = { status: 'ignored' } as const
 const FAILED_STALE_SESSION_SYNC_OPERATION = { status: 'sync_failed' } as const
 const ACTIVE_SESSION_READY_TIMEOUT_MS = 8_000
 // Navigation can mount another hook before the final write has settled.
-const sessionSaveQueues = new Map<string, { promise: Promise<void>; revision: { value: string | null } }>()
+type RevisionLineage = { value: string | null; unanswered?: string[] }
+const sessionSaveQueues = new Map<string, { promise: Promise<void>; revision: RevisionLineage }>()
 
 function serializeActiveWorkout(value: ActiveWorkout | null): string {
   return JSON.stringify(value ? {
@@ -114,7 +116,7 @@ function isSessionWriteGenerationCurrent(
 
 export function useActiveSession(uid: string | null) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const activeSessionRevisionRef = useRef<{ value: string | null }>({ value: null })
+  const activeSessionRevisionRef = useRef<RevisionLineage>({ value: null })
   const activeRef = useRef(useWorkoutStore.getState().active)
   const staleSessionRef = useRef<ActiveWorkout | null>(null)
   const closureIntentRef = useRef<WorkoutClosureIntent | null>(null)
@@ -163,7 +165,16 @@ export function useActiveSession(uid: string | null) {
         throw new Error('Active session write superseded.')
       }
       const expectedRevision = revision.value
-      const saved = await saveActiveSession(currentUid, snapshot, expectedRevision)
+      let saved: Awaited<ReturnType<typeof saveActiveSession>>
+      try {
+        saved = await saveActiveSession(currentUid, snapshot, expectedRevision, ...(revision.unanswered ? [revision.unanswered] : []))
+      } catch (error) {
+        const attempted = attemptedRevisionOf(error)
+        // shortcut: keeps the last 5 unanswered attempts, enough for a run of lost answers on one connection
+        if (attempted) revision.unanswered = [...(revision.unanswered ?? []), attempted].slice(-5)
+        throw error
+      }
+      revision.unanswered = undefined
       const latest = readActiveSessionBackupRecord(currentUid)
       if (latest?.session.sessionId === snapshot.sessionId && latest.baseRevision === expectedRevision
         && serializeActiveWorkout(latest.session) === serializeActiveWorkout(useWorkoutStore.getState().active)) {

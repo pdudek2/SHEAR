@@ -15,6 +15,7 @@ import {
   claimActiveSession,
   hasActiveSessionWork,
   persistTemplateLaunchSession,
+  attemptedRevisionOf,
   saveActiveSession,
   TemplateLaunchConflictError,
 } from '../activeSessionService'
@@ -175,6 +176,27 @@ describe('saveActiveSession', () => {
       '00000000-0000-4000-8000-000000000001',
       '00000000-0000-4000-8000-000000000002',
     ])
+  })
+
+  it('accepts a stored revision from this client\'s own unanswered save', async () => {
+    transactionGet.mockResolvedValue(sessionSnapshot({
+      sessionId: 'session-1',
+      sessionRevision: 'revision-lost-answer',
+    }))
+
+    await expect(saveActiveSession('user-1', workout, 'revision-known', ['revision-lost-answer']))
+      .resolves.toEqual({ sessionRevision: expect.any(String) })
+    await expect(saveActiveSession('user-1', workout, 'revision-known', ['revision-other']))
+      .rejects.toBeInstanceOf(ActiveSessionConflictError)
+  })
+
+  it('remembers the revision a save tried to write when it fails without an answer', async () => {
+    const lost = new Error('unavailable')
+    vi.mocked(runTransaction).mockRejectedValueOnce(lost)
+    vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('00000000-0000-4000-8000-000000000009')
+
+    await expect(saveActiveSession('user-1', workout, 'revision-known')).rejects.toBe(lost)
+    expect(attemptedRevisionOf(lost)).toBe('00000000-0000-4000-8000-000000000009')
   })
 
   it('rejects a stale revision without writing', async () => {

@@ -37,6 +37,7 @@ import { selectOnRetap } from '../components/workout/sessionHelpers'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import { ActionFeedback } from '../components/ActionFeedback'
+import { pageLoadId } from '../lib/pageReload'
 import { WorkoutDetailMobileActions } from '../components/WorkoutDetailMobileActions'
 import WorkoutProjectionStatus, {
   type ProjectionRetryState,
@@ -245,7 +246,7 @@ export default function WorkoutDetailPage() {
   useEffect(() => {
     if (!workoutResult) return
     // The result is shown once, but the page stays Train's until the user leaves it.
-    navigate(location.pathname, { replace: true, state: { savedWorkout: true } })
+    navigate(location.pathname, { replace: true, state: { savedWorkout: pageLoadId } })
   }, [location.pathname, navigate, workoutResult])
   const deleteScopeRef = useRef<object | null>(null)
   useEffect(() => {

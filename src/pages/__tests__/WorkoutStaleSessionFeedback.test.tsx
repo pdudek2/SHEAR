@@ -153,7 +153,7 @@ vi.mock('../../components/workout/WorkoutExerciseLedgerItem', () => ({
 }))
 
 vi.mock('sonner', () => ({
-  toast: { error: mocks.toastError, success: mocks.toastSuccess },
+  toast: { error: mocks.toastError, success: mocks.toastSuccess, dismiss: vi.fn() },
 }))
 
 vi.mock('framer-motion', () => {

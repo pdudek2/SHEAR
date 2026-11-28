@@ -43,6 +43,17 @@ describe('workoutStore set steppers', () => {
     useWorkoutStore.getState().clearRestTimer()
     useWorkoutStore.getState().hydrateFromDoc({ ...session, label: 'Legs' })
     expect(useWorkoutStore.getState().restTimer).toBeNull()
+
+    // A Skip also survives a reload of the page, when the store starts empty.
+    const stored = new Map<string, string>()
+    vi.stubGlobal('sessionStorage', { getItem: (key: string) => stored.get(key) ?? null, setItem: (key: string, value: string) => stored.set(key, value) })
+    useWorkoutStore.setState({ active: null, restTimer: null, restChecked: null })
+    useWorkoutStore.getState().hydrateFromDoc(session)
+    useWorkoutStore.getState().skipRest()
+    useWorkoutStore.setState({ active: null, restTimer: null, restChecked: null, restHandled: null })
+    useWorkoutStore.getState().hydrateFromDoc(session)
+    expect(useWorkoutStore.getState().restTimer).toBeNull()
+    vi.unstubAllGlobals()
   })
 
   it('keeps a skipped rest skipped after a local log, and when the session arrives again', () => {

@@ -94,6 +94,8 @@ export default function ProfilePage() {
     if (!user || !profile) return
     if (!displayName.trim()) { setNameError('Enter your name'); return }
     setNameError('')
+    // Offline the write would wait for the network with the button spinning; the user retries once connected
+    if (!navigator.onLine) { toast.error('Could not save. Try again.'); return }
     setSaving(true)
     const updated = { displayName: displayName.trim(), primaryGoal, weeklyGoal, units }
     try {
@@ -138,6 +140,7 @@ export default function ProfilePage() {
                 type="text"
                 placeholder="E.g. Alex"
                 value={displayName}
+                maxLength={80}
                 onChange={(e) => setDisplayName(e.target.value)}
                 autoComplete="name"
                 error={nameError}
