@@ -268,6 +268,7 @@ describe('useActiveSession snapshot authority', () => {
 
   it('sends an edit whose save failed offline again when the browser is back online, and only then', async () => {
     vi.useFakeTimers()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     saveActiveSession.mockRejectedValueOnce(new Error('offline'))
     renderHook(() => useActiveSession('user-1'))
     act(() => listener.current?.({
@@ -290,6 +291,23 @@ describe('useActiveSession snapshot authority', () => {
       await Promise.resolve()
     })
     expect(saveActiveSession).toHaveBeenCalledTimes(2)
+    consoleError.mockRestore()
+  })
+
+  it('leaves an unsent edit of another tab to that tab when the browser is back online', async () => {
+    renderHook(() => useActiveSession('user-1'))
+    act(() => listener.current?.({
+      session: editableRemoteSession, sessionRevision: 'revision-initial', fromCache: false, hasPendingWrites: false,
+    }))
+    // Another tab logged a set offline and marked the shared backup; this tab has no edit of its own.
+    const otherTab = { ...editableRemoteSession, label: 'Edited in another tab' }
+    writeActiveSessionBackup('user-1', otherTab, { baseRevision: 'revision-initial', unsynced: true })
+    await act(async () => {
+      window.dispatchEvent(new Event('online'))
+      await Promise.resolve()
+    })
+    expect(saveActiveSession).not.toHaveBeenCalled()
+    expect(readActiveSessionBackupRecord('user-1')?.session.label).toBe('Edited in another tab')
   })
 
   it('waits for the server before editing a copy whose revision it does not know', async () => {

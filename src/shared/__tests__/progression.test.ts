@@ -173,6 +173,7 @@ describe('sessionHint', () => {
     expect(sessionHint(kept, sets(['100', '8', false]), 'kg')).toBeNull()
     expect(sessionHint(kept, sets(['20', '10', true], ['100', '8', false]), 'kg')).toBeNull()
     expect(sessionHint(kept, sets(['90', '8', false]), 'kg')).toEqual({ label: 'Long break: first set is a test', weight: 100 })
+    expect(sessionHint(trial, sets(['60', '8', false]), 'kg')).toEqual({ label: 'Long break: first set is a test at −2.5 kg' })
     const unknown = run([session(120, sets3(100, 8))])
     expect(sessionHint(unknown, sets(['', '8', false]), 'kg')).toBeNull()
   })

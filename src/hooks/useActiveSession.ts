@@ -750,7 +750,10 @@ export function useActiveSession(uid: string | null) {
 
     const handlePageHide = () => flushPendingSession()
     // A save that failed offline is otherwise only sent again with the next change or a reload.
-    const handleOnline = () => { if (readActiveSessionBackupRecord(currentUid)?.unsynced) flushPendingSession() }
+    // Only this tab's own unsent edits: the backup flag is shared by every open tab.
+    const handleOnline = () => {
+      if (hasUnsyncedLocalChangesRef.current && readActiveSessionBackupRecord(currentUid)?.unsynced !== false) flushPendingSession()
+    }
     window.addEventListener('pagehide', handlePageHide)
     window.addEventListener('online', handleOnline)
     document.addEventListener('visibilitychange', handleVisibilityChange)

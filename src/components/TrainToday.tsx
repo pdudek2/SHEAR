@@ -29,7 +29,6 @@ export function TrainTime({ today, plannedSets, budgetMin, straight, fullSets, o
   const kept = compression.sets.reduce((sum, sets) => sum + sets, 0)
   const grouped = compression.blocks.some((block) => block.group && block.items.filter((item) => item.sets > 0).length > 1)
 
-
   return (
     <div className="train-dock-today train-today">
       {today.breakDays !== null && (
