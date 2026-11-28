@@ -81,19 +81,24 @@ export async function saveActiveSession(
 ): Promise<SavedActiveSession> {
   const ref = activeSessionRef(uid)
   const sessionRevision = crypto.randomUUID()
+  let wrote = false
   await runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(ref)
     const data = snapshot.exists() ? snapshot.data() : null
     const storedSessionId = data && typeof data.sessionId === 'string' ? data.sessionId : null
     const storedRevision = readSessionRevision(data)
+    // The SDK re-runs the function after a lost commit answer; finding this call's own write means it landed
+    if (storedSessionId === workout.sessionId && storedRevision === sessionRevision) return
     if (
       (snapshot.exists() && storedSessionId !== workout.sessionId)
       || (storedRevision !== expectedRevision && !(storedRevision && ownRevisions.includes(storedRevision)))
     ) throw new ActiveSessionConflictError()
 
     transaction.set(ref, activeSessionDocument(uid, workout, sessionRevision))
+    wrote = true
   }).catch((error: unknown) => {
-    if (error && typeof error === 'object' && !(error instanceof ActiveSessionConflictError)) attemptedRevisions.set(error, sessionRevision)
+    // Only a commit that was attempted can have landed; a save that never reached the write is not remembered
+    if (wrote && error && typeof error === 'object' && !(error instanceof ActiveSessionConflictError)) attemptedRevisions.set(error, sessionRevision)
     throw error
   })
   return { sessionRevision }

@@ -156,6 +156,12 @@ function revealClosureAlert(alert: HTMLDivElement | null) {
   alert?.focus({ preventScroll: true })
 }
 
+// The log questions wait for an answer, so they go whenever the set they ask about may be gone
+function dismissLogQuestions() {
+  toast.dismiss('log-without-weight')
+  toast.dismiss('log-weight-slip')
+}
+
 function getExerciseClientId(exercise: WorkoutExercise, exerciseIndex: number): string {
   return exercise.clientId ?? `${exercise.exerciseSource}:${exercise.exerciseId}:${exerciseIndex}`
 }
@@ -239,6 +245,9 @@ export default function WorkoutPage() {
     mountedRef.current = true
     return () => { mountedRef.current = false }
   }, [])
+  // Leaving the page, finishing or another session taking over ends any open log question
+  const activeSessionId = active?.sessionId
+  useEffect(() => () => dismissLogQuestions(), [activeSessionId])
   const [showPicker, setShowPicker] = useState(false)
   const [closureRejection, setClosureRejection] = useState<string | null>(null)
   const addExerciseRef = useRef<HTMLButtonElement>(null)
@@ -337,9 +346,7 @@ export default function WorkoutPage() {
       })
       return
     }
-    // A question left unanswered must not outlive the set it asked about
-    toast.dismiss('log-without-weight')
-    toast.dismiss('log-weight-slip')
+    dismissLogQuestions()
     toggleSetDone(exerciseIndex, setIndex)
     if (wasNotDone) {
       const next = useWorkoutStore.getState().active
@@ -393,6 +400,7 @@ export default function WorkoutPage() {
 
     const hasEnteredData = set.done || set.weight.trim() !== '' || set.reps.trim() !== ''
     if (!hasEnteredData) {
+      dismissLogQuestions()
       removeSet(exerciseIndex, setIndex)
       return
     }
@@ -414,7 +422,10 @@ export default function WorkoutPage() {
       (set) => set.clientId === pendingSetRemoval.setClientId,
     ) ?? -1
 
-    if (exerciseIndex >= 0 && setIndex >= 0) removeSet(exerciseIndex, setIndex)
+    if (exerciseIndex >= 0 && setIndex >= 0) {
+      dismissLogQuestions()
+      removeSet(exerciseIndex, setIndex)
+    }
     setPendingSetRemoval(null)
   }
 
@@ -629,7 +640,10 @@ export default function WorkoutPage() {
       : -1
     // Sets that changed while the dialog was open came from another device: the user confirmed a different exercise.
     if (index >= 0 && JSON.stringify(currentActive!.exercises[index]!.sets) !== pendingExerciseRemoval.sets) toast.error('This exercise changed on another device. Check it and remove it again if you still want to.')
-    else if (index >= 0) removeExercise(index)
+    else if (index >= 0) {
+      dismissLogQuestions()
+      removeExercise(index)
+    }
     setPendingExerciseRemoval(null)
   }
 

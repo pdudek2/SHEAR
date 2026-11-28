@@ -219,12 +219,15 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
       const current = state.active?.sessionId === active.sessionId && state.restTimer ? { sessionId: active.sessionId, ...state.restTimer } : null
       // Before the user's own exercises load (right after a reload) their rests use the 120 s default, as on Android.
       const roles = sessionRoles(active.exercises, state.exerciseMeta ?? undefined)
-      const checked = state.restChecked ?? readSkippedRest(active.sessionId)
+      const skipped = state.restChecked || state.restHandled ? null : readSkippedRest(active.sessionId)
+      const checked = state.restChecked ?? skipped
       const next = reconcileRest(current, checked, active, roles, active.compression?.shortRest === true, Date.now())
       return {
         active,
         restTimer: next.rest === current ? (current && state.restTimer) : next.rest && { startedAt: next.rest.startedAt, totalSec: next.rest.totalSec },
         restChecked: next.checked,
+        // The skipped set also stays handled, so adding a set after the reload does not bring its rest back
+        ...(skipped ? { restHandled: skipped } : {}),
       }
     }),
 

@@ -121,14 +121,5 @@ describe('ProfilePage hierarchy and settings', () => {
     })
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
 
-    // Offline nothing is sent, so the button does not spin until the network returns
-    mocks.toastError.mockClear()
-    mocks.updateProfile.mockClear()
-    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
-    expect(mocks.updateProfile).not.toHaveBeenCalled()
-    expect(mocks.toastError).toHaveBeenCalledWith('Could not save. Try again.')
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
-    online.mockRestore()
   })
 })

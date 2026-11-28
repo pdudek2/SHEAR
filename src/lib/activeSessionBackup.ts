@@ -10,6 +10,8 @@ export interface ActiveSessionBackupRecord {
   session: ActiveWorkout
   baseRevision: string | null
   unsynced: boolean
+  // Revisions of saves whose answer was lost: the server may hold one of them, so a later save may overwrite it
+  unanswered?: string[]
 }
 
 function storageKey(uid: string) {
@@ -39,6 +41,9 @@ export function readActiveSessionBackupRecord(uid: string): ActiveSessionBackupR
       savedAt: parsed.savedAt,
       baseRevision: typeof parsed.baseRevision === 'string' ? parsed.baseRevision : null,
       unsynced: parsed.unsynced === true,
+      ...(Array.isArray(parsed.unanswered) && parsed.unanswered.every((item) => typeof item === 'string') && parsed.unanswered.length
+        ? { unanswered: parsed.unanswered }
+        : {}),
       session: {
         ...session,
         sessionId: normalizeSessionId(session.sessionId, uid, startedAt),
@@ -57,7 +62,7 @@ export function readActiveSessionBackup(uid: string): ActiveWorkout | null {
 export function writeActiveSessionBackup(
   uid: string,
   session: ActiveWorkout,
-  sync: { baseRevision: string | null; unsynced: boolean } = { baseRevision: null, unsynced: false },
+  sync: { baseRevision: string | null; unsynced: boolean; unanswered?: string[] } = { baseRevision: null, unsynced: false },
 ): void {
   if (typeof window === 'undefined') return
 

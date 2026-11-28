@@ -297,6 +297,69 @@ describe('useActiveSession snapshot authority', () => {
     consoleError.mockRestore()
   })
 
+  it('keeps every unanswered save with the backup, so a remount may still overwrite its own landed write', async () => {
+    vi.useFakeTimers()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    saveActiveSession.mockRejectedValue(new Error('offline'))
+    const first = renderHook(() => useActiveSession('user-1'))
+    act(() => listener.current?.({
+      session: editableRemoteSession, sessionRevision: 'revision-initial', fromCache: false, hasPendingWrites: false,
+    }))
+    // Six lost answers in a row: none is dropped
+    for (const reps of ['6', '7', '8', '9', '10', '11']) {
+      act(() => useWorkoutStore.getState().updateSet(0, 0, 'reps', reps))
+      await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    }
+    expect(saveActiveSession).toHaveBeenCalledTimes(6)
+    expect(readActiveSessionBackupRecord('user-1')?.unanswered).toHaveLength(6)
+
+    first.unmount()
+    saveActiveSession.mockReset().mockResolvedValue({ sessionRevision: 'revision-after-remount' })
+    renderHook(() => useActiveSession('user-1'))
+    // The server holds the write whose answer was lost
+    act(() => listener.current?.({
+      session: editableRemoteSession, sessionRevision: 'revision-lost-answer', fromCache: false, hasPendingWrites: false,
+    }))
+    act(() => useWorkoutStore.getState().updateSet(0, 0, 'reps', '12'))
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    // The first save after the remount still carries them; a success then clears them
+    expect(saveActiveSession.mock.calls[0]?.[3]).toHaveLength(6)
+    expect(readActiveSessionBackupRecord('user-1')?.unanswered).toBeUndefined()
+    consoleError.mockRestore()
+  })
+
+  it('moves the base to the retry\'s revision when the server echoed our own lost write meanwhile', async () => {
+    vi.useFakeTimers()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    renderHook(() => useActiveSession('user-1'))
+    act(() => listener.current?.({
+      session: editableRemoteSession, sessionRevision: 'revision-initial', fromCache: false, hasPendingWrites: false,
+    }))
+    saveActiveSession.mockRejectedValueOnce(new Error('offline'))
+    act(() => useWorkoutStore.getState().updateSet(0, 0, 'reps', '7'))
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+
+    const retry = createDeferred<{ sessionRevision: string }>()
+    saveActiveSession.mockImplementationOnce(() => retry.promise)
+    await act(async () => {
+      window.dispatchEvent(new Event('online'))
+      await Promise.resolve()
+    })
+    // While the retry is out, the listener delivers the lost write: same content, our own revision
+    const landed = { ...editableRemoteSession, exercises: [{ ...editableRemoteSession.exercises[0]!, sets: [{ weight: '80', reps: '7', done: false }] }] }
+    act(() => listener.current?.({ session: landed, sessionRevision: 'revision-lost-answer', fromCache: false, hasPendingWrites: false }))
+    await act(async () => {
+      retry.resolve({ sessionRevision: 'revision-retry' })
+      await Promise.resolve()
+    })
+
+    saveActiveSession.mockResolvedValueOnce({ sessionRevision: 'revision-next' })
+    act(() => useWorkoutStore.getState().updateSet(0, 0, 'reps', '8'))
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    expect(saveActiveSession.mock.calls.at(-1)?.[2]).toBe('revision-retry')
+    consoleError.mockRestore()
+  })
+
   it('leaves an unsent edit of another tab to that tab when the browser is back online', async () => {
     renderHook(() => useActiveSession('user-1'))
     act(() => listener.current?.({

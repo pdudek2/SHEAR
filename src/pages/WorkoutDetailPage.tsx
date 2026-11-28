@@ -37,7 +37,7 @@ import { selectOnRetap } from '../components/workout/sessionHelpers'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import { ActionFeedback } from '../components/ActionFeedback'
-import { pageLoadId } from '../lib/pageReload'
+import { readWorkoutResult, savedWorkoutEntry } from '../lib/savedWorkoutView'
 import { WorkoutDetailMobileActions } from '../components/WorkoutDetailMobileActions'
 import WorkoutProjectionStatus, {
   type ProjectionRetryState,
@@ -74,10 +74,6 @@ interface WorkoutDeleteOperation {
   status: 'pending' | 'cleanup_pending' | 'unknown' | 'error'
 }
 
-interface WorkoutResultState {
-  workoutId: string
-  status: 'materialized' | 'projection_pending'
-}
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString('en-US', {
@@ -114,22 +110,6 @@ function readWorkoutPreview(state: unknown, workoutId: string | undefined, uid: 
   if (!preview || preview.id !== workoutId || !uid || previewUid !== uid) return null
 
   return preview
-}
-
-function readWorkoutResult(state: unknown, workoutId: string | undefined): WorkoutResultState | null {
-  if (!state || typeof state !== 'object' || Array.isArray(state)) return null
-
-  const result = (state as { workoutResult?: unknown }).workoutResult
-  if (!result || typeof result !== 'object' || Array.isArray(result)) return null
-
-  const { workoutId: resultWorkoutId, status } = result as Record<string, unknown>
-  if (
-    typeof resultWorkoutId !== 'string'
-    || resultWorkoutId !== workoutId
-    || (status !== 'materialized' && status !== 'projection_pending')
-  ) return null
-
-  return { workoutId: resultWorkoutId, status }
 }
 
 function parseSetDraftValue(field: 'weight' | 'reps', value: string): number {
@@ -246,7 +226,7 @@ export default function WorkoutDetailPage() {
   useEffect(() => {
     if (!workoutResult) return
     // The result is shown once, but the page stays Train's until the user leaves it.
-    navigate(location.pathname, { replace: true, state: { savedWorkout: pageLoadId } })
+    navigate(location.pathname, { replace: true, state: savedWorkoutEntry(workoutResult) })
   }, [location.pathname, navigate, workoutResult])
   const deleteScopeRef = useRef<object | null>(null)
   useEffect(() => {

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { Dumbbell, History, MessageSquare, TrendingUp } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { navigateWithAppTransition } from '../lib/viewTransitions'
-import { pageLoadId } from '../lib/pageReload'
+import { readWorkoutResult } from '../lib/savedWorkoutView'
 import { preloadRouteByPath } from '../router/pageLoaders'
 import { useWorkoutStore } from '../store/workoutStore'
 import ActiveWorkoutReturnBar from './ActiveWorkoutReturnBar'
@@ -49,9 +49,7 @@ export default function BottomNav() {
   const workoutActive = path.startsWith('/workout/new')
   const workoutDetail = path.startsWith('/workout/') && !workoutActive
   // The page that follows Finish belongs to Train and keeps the tabs; other workout pages hide them.
-  const routeState = location.state as { workoutResult?: unknown; savedWorkout?: unknown } | null
-  // After a reload the page shows the plain workout, so the tabs follow it
-  const savedWorkout = workoutDetail && Boolean(routeState?.workoutResult || routeState?.savedWorkout === pageLoadId)
+  const savedWorkout = workoutDetail && readWorkoutResult(location.state, decodeURIComponent(path.slice('/workout/'.length))) !== null
   const go = (to: string) => navigateWithAppTransition(navigate, to)
 
   // With no session /workout/new is a resting page, so the bar stays as the way out.

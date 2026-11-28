@@ -138,10 +138,8 @@ export function useActiveSession(uid: string | null) {
   const [activeSessionSyncStatus, setActiveSessionSyncStatus] = useState<ActiveSessionSyncStatusValue>('idle')
 
   function writeSessionBackup(currentUid: string, snapshot: ActiveWorkout, unsynced = hasUnsyncedLocalChangesRef.current) {
-    writeActiveSessionBackup(currentUid, snapshot, {
-      baseRevision: activeSessionRevisionRef.current.value,
-      unsynced,
-    })
+    const { value, unanswered } = activeSessionRevisionRef.current
+    writeActiveSessionBackup(currentUid, snapshot, { baseRevision: value, unsynced, ...(unanswered?.length ? { unanswered } : {}) })
   }
 
   function saveSessionWithRevision(
@@ -165,13 +163,20 @@ export function useActiveSession(uid: string | null) {
         throw new Error('Active session write superseded.')
       }
       const expectedRevision = revision.value
+      const own = revision.unanswered ?? []
       let saved: Awaited<ReturnType<typeof saveActiveSession>>
       try {
-        saved = await saveActiveSession(currentUid, snapshot, expectedRevision, ...(revision.unanswered ? [revision.unanswered] : []))
+        saved = await saveActiveSession(currentUid, snapshot, expectedRevision, ...(own.length ? [own] : []))
       } catch (error) {
         const attempted = attemptedRevisionOf(error)
-        // shortcut: keeps the last 5 unanswered attempts, enough for a run of lost answers on one connection
-        if (attempted) revision.unanswered = [...(revision.unanswered ?? []), attempted].slice(-5)
+        if (attempted) {
+          revision.unanswered = [...(revision.unanswered ?? []), attempted]
+          // Kept with the backup, so a reload or a visit to another tab still knows the write may have landed
+          const stored = readActiveSessionBackupRecord(currentUid)
+          if (stored?.session.sessionId === snapshot.sessionId) {
+            writeActiveSessionBackup(currentUid, stored.session, { baseRevision: stored.baseRevision, unsynced: stored.unsynced, unanswered: revision.unanswered })
+          }
+        }
         throw error
       }
       revision.unanswered = undefined
@@ -184,7 +189,8 @@ export function useActiveSession(uid: string | null) {
         })
       }
       // Advance only this runtime's lineage; another tab's backup cannot authorize a write.
-      if (revision.value === expectedRevision
+      // The listener may already have moved the base to our own landed write; that is not someone else's
+      if ((revision.value === expectedRevision || (revision.value !== null && own.includes(revision.value)))
         && useWorkoutStore.getState().active?.sessionId === snapshot.sessionId
         && !isConfirmedClosedSessionId(snapshot.sessionId, confirmedClosedSessionIdsRef.current)) {
         revision.value = saved.sessionRevision
@@ -500,7 +506,7 @@ export function useActiveSession(uid: string | null) {
       ? backupAtMount.baseRevision
       : null
     activeSessionRevisionRef.current = sessionSaveQueues.get(`${currentUid}:${mountedSessionId}`)?.revision
-      ?? { value: backupRevision }
+      ?? { value: backupRevision, unanswered: backupAtMount && backupAtMount.session.sessionId === mountedSessionId ? backupAtMount.unanswered : undefined }
     setReady(false)
     staleSessionRef.current = null
     setStaleSession(null)
