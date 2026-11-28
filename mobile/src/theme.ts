@@ -10,7 +10,8 @@ export const colors = {
   surfaceHigh: palette.surfaceHigh,
   line: palette.line,
   lineStrong: palette.lineStrong,
-  track: palette.track,
+  // Derived here, not a palette key: palette.ts feeds the native fingerprint, so a new key would force an APK build
+  track: `${palette.mutedSoft}99`,
   text: palette.text,
   textStrong: palette.textStrong,
   muted: palette.muted,

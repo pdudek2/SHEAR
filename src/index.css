@@ -6333,12 +6333,12 @@ button.progress-exercise-row:hover .progress-exercise-name {
 .readiness-slider::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 3px;
-  background: var(--track);
+  background: color-mix(in srgb, var(--muted-soft) 60%, transparent);
 }
 .readiness-slider::-moz-range-track {
   height: 6px;
   border-radius: 3px;
-  background: var(--track);
+  background: color-mix(in srgb, var(--muted-soft) 60%, transparent);
 }
 .readiness-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
