@@ -64,23 +64,42 @@ export function subscribeToActiveSession(
   )
 }
 
+const attemptedRevisions = new WeakMap<object, string>()
+
+// The revision a failed save tried to write; the write may still have landed when only the answer was lost.
+export function attemptedRevisionOf(error: unknown): string | null {
+  return error && typeof error === 'object' ? attemptedRevisions.get(error) ?? null : null
+}
+
+// `ownRevisions` are revisions of this client's earlier saves whose answer never came: the server may hold one of them,
+// and overwriting our own write is not a conflict.
 export async function saveActiveSession(
   uid: string,
   workout: ActiveWorkout,
   expectedRevision: string | null,
+  ownRevisions: readonly string[] = [],
 ): Promise<SavedActiveSession> {
   const ref = activeSessionRef(uid)
   const sessionRevision = crypto.randomUUID()
+  let wrote = false
   await runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(ref)
     const data = snapshot.exists() ? snapshot.data() : null
     const storedSessionId = data && typeof data.sessionId === 'string' ? data.sessionId : null
+    const storedRevision = readSessionRevision(data)
+    // The SDK re-runs the function after a lost commit answer; finding this call's own write means it landed
+    if (storedSessionId === workout.sessionId && storedRevision === sessionRevision) return
     if (
       (snapshot.exists() && storedSessionId !== workout.sessionId)
-      || readSessionRevision(data) !== expectedRevision
+      || (storedRevision !== expectedRevision && !(storedRevision && ownRevisions.includes(storedRevision)))
     ) throw new ActiveSessionConflictError()
 
     transaction.set(ref, activeSessionDocument(uid, workout, sessionRevision))
+    wrote = true
+  }).catch((error: unknown) => {
+    // Only a commit that was attempted can have landed; a save that never reached the write is not remembered
+    if (wrote && error && typeof error === 'object' && !(error instanceof ActiveSessionConflictError)) attemptedRevisions.set(error, sessionRevision)
+    throw error
   })
   return { sessionRevision }
 }
@@ -122,6 +141,8 @@ export async function persistTemplateLaunchSession(
 
   await runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(ref)
+    // The SDK re-runs the function after a lost commit answer; finding this call's own write means it landed
+    if (snapshot.exists() && readSessionRevision(snapshot.data()) === sessionRevision) return
     if (!replaceExisting && snapshot.exists() && sessionDocumentHasWork(snapshot.data())) {
       throw new TemplateLaunchConflictError()
     }

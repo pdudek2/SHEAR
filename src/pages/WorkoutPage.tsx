@@ -156,6 +156,12 @@ function revealClosureAlert(alert: HTMLDivElement | null) {
   alert?.focus({ preventScroll: true })
 }
 
+// The log questions wait for an answer, so they go whenever the set they ask about may be gone
+function dismissLogQuestions() {
+  toast.dismiss('log-without-weight')
+  toast.dismiss('log-weight-slip')
+}
+
 function getExerciseClientId(exercise: WorkoutExercise, exerciseIndex: number): string {
   return exercise.clientId ?? `${exercise.exerciseSource}:${exercise.exerciseId}:${exerciseIndex}`
 }
@@ -239,6 +245,9 @@ export default function WorkoutPage() {
     mountedRef.current = true
     return () => { mountedRef.current = false }
   }, [])
+  // Leaving the page, a finish or discard starting, or another session taking over ends any open log question
+  const activeSessionId = active?.sessionId
+  useEffect(() => () => dismissLogQuestions(), [activeSessionId, closureState])
   const [showPicker, setShowPicker] = useState(false)
   const [closureRejection, setClosureRejection] = useState<string | null>(null)
   const addExerciseRef = useRef<HTMLButtonElement>(null)
@@ -322,18 +331,22 @@ export default function WorkoutPage() {
         if (inToast) (document.activeElement as HTMLElement).blur()
         document.querySelector<HTMLInputElement>('.workout-set-panel input[role="spinbutton"]')?.focus()
       }
+      // A question waits for its answer; a timed toast vanished before slower readers could tap it
       if (unweighted) toast('No weight entered. Log this set without weight?', {
         id: 'log-without-weight',
+        duration: Infinity,
         action: { label: 'Log without weight', onClick: logAnyway },
         cancel: { label: 'Enter weight', onClick: enterWeight },
       })
       else if (slip) toast(`${slip.title} ${slip.message}`, {
         id: 'log-weight-slip',
+        duration: Infinity,
         action: { label: 'Log anyway', onClick: logAnyway },
         cancel: { label: 'Fix', onClick: enterWeight },
       })
       return
     }
+    dismissLogQuestions()
     toggleSetDone(exerciseIndex, setIndex)
     if (wasNotDone) {
       const next = useWorkoutStore.getState().active
@@ -387,6 +400,7 @@ export default function WorkoutPage() {
 
     const hasEnteredData = set.done || set.weight.trim() !== '' || set.reps.trim() !== ''
     if (!hasEnteredData) {
+      dismissLogQuestions()
       removeSet(exerciseIndex, setIndex)
       return
     }
@@ -408,7 +422,10 @@ export default function WorkoutPage() {
       (set) => set.clientId === pendingSetRemoval.setClientId,
     ) ?? -1
 
-    if (exerciseIndex >= 0 && setIndex >= 0) removeSet(exerciseIndex, setIndex)
+    if (exerciseIndex >= 0 && setIndex >= 0) {
+      dismissLogQuestions()
+      removeSet(exerciseIndex, setIndex)
+    }
     setPendingSetRemoval(null)
   }
 
@@ -623,7 +640,10 @@ export default function WorkoutPage() {
       : -1
     // Sets that changed while the dialog was open came from another device: the user confirmed a different exercise.
     if (index >= 0 && JSON.stringify(currentActive!.exercises[index]!.sets) !== pendingExerciseRemoval.sets) toast.error('This exercise changed on another device. Check it and remove it again if you still want to.')
-    else if (index >= 0) removeExercise(index)
+    else if (index >= 0) {
+      dismissLogQuestions()
+      removeExercise(index)
+    }
     setPendingExerciseRemoval(null)
   }
 

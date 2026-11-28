@@ -75,6 +75,7 @@ export default function OnboardingPage() {
             type="text"
             placeholder="E.g. Alex"
             value={displayName}
+            maxLength={80}
             onChange={(e) => setDisplayName(e.target.value)}
             autoComplete="name"
             error={nameError}

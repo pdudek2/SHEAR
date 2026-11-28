@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   storeUid: undefined as string | null | undefined,
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
+  toastDismiss: vi.fn(),
   uid: 'user-1' as string | null,
 }))
 
@@ -153,7 +154,7 @@ vi.mock('../../components/workout/WorkoutExerciseLedgerItem', () => ({
 }))
 
 vi.mock('sonner', () => ({
-  toast: { error: mocks.toastError, success: mocks.toastSuccess },
+  toast: { error: mocks.toastError, success: mocks.toastSuccess, dismiss: mocks.toastDismiss },
 }))
 
 vi.mock('framer-motion', () => {
@@ -231,6 +232,7 @@ describe('WorkoutPage stale-session feedback', () => {
     mocks.storeUid = undefined
     mocks.toastError.mockReset()
     mocks.toastSuccess.mockReset()
+    mocks.toastDismiss.mockReset()
     mocks.uid = 'user-1'
   })
 
@@ -541,6 +543,18 @@ describe('WorkoutPage stale-session feedback', () => {
     } finally {
       clearWorkoutClosureIntent('user-1')
     }
+  })
+
+  it('closes an open log question when a finish starts and when the workout page goes away', () => {
+    const { rerender, unmount } = renderStaleSessionPage()
+    mocks.toastDismiss.mockClear()
+    mocks.closureState = 'submitting'
+    rerender(createElement(MemoryRouter, null, createElement(WorkoutPage)))
+    expect(mocks.toastDismiss).toHaveBeenCalledWith('log-without-weight')
+    mocks.toastDismiss.mockClear()
+    unmount()
+    expect(mocks.toastDismiss).toHaveBeenCalledWith('log-without-weight')
+    expect(mocks.toastDismiss).toHaveBeenCalledWith('log-weight-slip')
   })
 
   it('sends a finish left pending by a reload once on its own', async () => {

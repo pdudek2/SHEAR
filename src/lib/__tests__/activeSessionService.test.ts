@@ -15,6 +15,7 @@ import {
   claimActiveSession,
   hasActiveSessionWork,
   persistTemplateLaunchSession,
+  attemptedRevisionOf,
   saveActiveSession,
   TemplateLaunchConflictError,
 } from '../activeSessionService'
@@ -55,6 +56,8 @@ const workout: ActiveWorkout = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  transactionGet.mockReset()
+  transactionSet.mockReset()
   vi.mocked(doc).mockReturnValue(sessionRef as never)
   vi.spyOn(Date, 'now').mockReturnValue(999)
   snapshotHandler = undefined
@@ -127,6 +130,19 @@ describe('persistTemplateLaunchSession', () => {
     expect(transactionSet).not.toHaveBeenCalled()
   })
 
+  it('treats finding its own launch on the SDK\'s retry as success, not as someone else\'s work', async () => {
+    let stored: Record<string, unknown> | undefined
+    transactionGet.mockImplementation(async () => sessionSnapshot(stored))
+    transactionSet.mockImplementation((_ref, document: Record<string, unknown>) => { stored = document })
+    vi.mocked(runTransaction).mockImplementationOnce(async (_db, update) => {
+      await update({ get: transactionGet, set: transactionSet } as never)
+      return update({ get: transactionGet, set: vi.fn() } as never)
+    })
+
+    const revision = await persistTemplateLaunchSession('user-1', workout, false)
+    expect(revision).toBe(stored?.sessionRevision)
+  })
+
   it('writes when replacement is explicitly allowed despite remote work', async () => {
     transactionGet.mockResolvedValue(sessionSnapshot({ label: 'Current workout', exercises: [] }))
 
@@ -175,6 +191,51 @@ describe('saveActiveSession', () => {
       '00000000-0000-4000-8000-000000000001',
       '00000000-0000-4000-8000-000000000002',
     ])
+  })
+
+  it('accepts a stored revision from this client\'s own unanswered save', async () => {
+    transactionGet.mockResolvedValue(sessionSnapshot({
+      sessionId: 'session-1',
+      sessionRevision: 'revision-lost-answer',
+    }))
+
+    await expect(saveActiveSession('user-1', workout, 'revision-known', ['revision-lost-answer']))
+      .resolves.toEqual({ sessionRevision: expect.any(String) })
+    await expect(saveActiveSession('user-1', workout, 'revision-known', ['revision-other']))
+      .rejects.toBeInstanceOf(ActiveSessionConflictError)
+  })
+
+  it('remembers the revision a save tried to write when its commit got no answer, and only then', async () => {
+    transactionGet.mockResolvedValue(sessionSnapshot({ sessionId: 'session-1', sessionRevision: 'revision-known' }))
+    const lost = new Error('unavailable')
+    vi.mocked(runTransaction).mockImplementationOnce(async (_db, update) => {
+      await update({ get: transactionGet, set: transactionSet } as never)
+      throw lost
+    })
+    vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('00000000-0000-4000-8000-000000000009')
+    await expect(saveActiveSession('user-1', workout, 'revision-known')).rejects.toBe(lost)
+    expect(attemptedRevisionOf(lost)).toBe('00000000-0000-4000-8000-000000000009')
+
+    // Offline the read fails before any write: nothing can have landed, so nothing is remembered
+    const offline = new Error('unavailable')
+    vi.mocked(runTransaction).mockRejectedValueOnce(offline)
+    await expect(saveActiveSession('user-1', workout, 'revision-known')).rejects.toBe(offline)
+    expect(attemptedRevisionOf(offline)).toBeNull()
+  })
+
+  it('treats finding its own write on the SDK\'s retry of the same save as success', async () => {
+    let stored = 'revision-known'
+    transactionGet.mockImplementation(async () => sessionSnapshot({ sessionId: 'session-1', sessionRevision: stored }))
+    transactionSet.mockImplementation((_ref, document: { sessionRevision: string }) => { stored = document.sessionRevision })
+    // The commit lands, its answer is lost, and the SDK runs the function again
+    vi.mocked(runTransaction).mockImplementationOnce(async (_db, update) => {
+      await update({ get: transactionGet, set: transactionSet } as never)
+      return update({ get: transactionGet, set: vi.fn() } as never)
+    })
+
+    const saved = await saveActiveSession('user-1', workout, 'revision-known')
+    expect(saved.sessionRevision).toBe(stored)
+    expect(stored).not.toBe('revision-known')
   })
 
   it('rejects a stale revision without writing', async () => {

@@ -167,6 +167,26 @@ function editSet(s: WorkoutState, exerciseIndex: number, setIndex: number, field
   return { active: { ...s.active, exercises }, weightCorrection: correction }
 }
 
+// A Skip survives a reload in this tab: the store is empty then, and the hydrate would bring the skipped rest back.
+const SKIPPED_REST_KEY = 'ironlog:rest-skipped'
+
+function readSkippedRest(sessionId: string): RestCheck | null {
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(SKIPPED_REST_KEY) ?? 'null') as RestCheck | null
+    return stored?.sessionId === sessionId && typeof stored.at === 'number' ? stored : null
+  } catch {
+    return null
+  }
+}
+
+function writeSkippedRest(check: RestCheck | null) {
+  try {
+    if (check) sessionStorage.setItem(SKIPPED_REST_KEY, JSON.stringify(check))
+  } catch {
+    // Without storage a Skip still holds until the next reload
+  }
+}
+
 const handled = (active: ActiveWorkout | null, current: RestCheck | null): RestCheck | null => (
   active ? { sessionId: active.sessionId, at: latestLoggedAt(active.exercises) } : current
 )
@@ -199,11 +219,15 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
       const current = state.active?.sessionId === active.sessionId && state.restTimer ? { sessionId: active.sessionId, ...state.restTimer } : null
       // Before the user's own exercises load (right after a reload) their rests use the 120 s default, as on Android.
       const roles = sessionRoles(active.exercises, state.exerciseMeta ?? undefined)
-      const next = reconcileRest(current, state.restChecked, active, roles, active.compression?.shortRest === true, Date.now())
+      const skipped = state.restChecked || state.restHandled ? null : readSkippedRest(active.sessionId)
+      const checked = state.restChecked ?? skipped
+      const next = reconcileRest(current, checked, active, roles, active.compression?.shortRest === true, Date.now())
       return {
         active,
         restTimer: next.rest === current ? (current && state.restTimer) : next.rest && { startedAt: next.rest.startedAt, totalSec: next.rest.totalSec },
         restChecked: next.checked,
+        // The skipped set also stays handled, so adding a set after the reload does not bring its rest back
+        ...(skipped ? { restHandled: skipped } : {}),
       }
     }),
 
@@ -215,6 +239,7 @@ export const useWorkoutStore = create<WorkoutState>()((set) => ({
   skipRest: () => {
     useWorkoutStore.getState().clearRestTimer()
     set((state) => ({ restHandled: handled(state.active, state.restHandled) }))
+    writeSkippedRest(useWorkoutStore.getState().restChecked)
   },
 
   addRestTimerSeconds: (deltaSec) =>

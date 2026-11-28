@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { stripWorkoutClientIds, useWorkoutStore, type ActiveWorkout } from '../store/workoutStore'
 import {
   ActiveSessionConflictError,
+  attemptedRevisionOf,
   claimActiveSession,
   loadActiveSessionFromServer,
   saveActiveSession,
@@ -58,7 +59,8 @@ const IGNORED_STALE_SESSION_OPERATION = { status: 'ignored' } as const
 const FAILED_STALE_SESSION_SYNC_OPERATION = { status: 'sync_failed' } as const
 const ACTIVE_SESSION_READY_TIMEOUT_MS = 8_000
 // Navigation can mount another hook before the final write has settled.
-const sessionSaveQueues = new Map<string, { promise: Promise<void>; revision: { value: string | null } }>()
+type RevisionLineage = { value: string | null; unanswered?: string[] }
+const sessionSaveQueues = new Map<string, { promise: Promise<void>; revision: RevisionLineage }>()
 
 function serializeActiveWorkout(value: ActiveWorkout | null): string {
   return JSON.stringify(value ? {
@@ -114,7 +116,7 @@ function isSessionWriteGenerationCurrent(
 
 export function useActiveSession(uid: string | null) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const activeSessionRevisionRef = useRef<{ value: string | null }>({ value: null })
+  const activeSessionRevisionRef = useRef<RevisionLineage>({ value: null })
   const activeRef = useRef(useWorkoutStore.getState().active)
   const staleSessionRef = useRef<ActiveWorkout | null>(null)
   const closureIntentRef = useRef<WorkoutClosureIntent | null>(null)
@@ -136,10 +138,8 @@ export function useActiveSession(uid: string | null) {
   const [activeSessionSyncStatus, setActiveSessionSyncStatus] = useState<ActiveSessionSyncStatusValue>('idle')
 
   function writeSessionBackup(currentUid: string, snapshot: ActiveWorkout, unsynced = hasUnsyncedLocalChangesRef.current) {
-    writeActiveSessionBackup(currentUid, snapshot, {
-      baseRevision: activeSessionRevisionRef.current.value,
-      unsynced,
-    })
+    const { value, unanswered } = activeSessionRevisionRef.current
+    writeActiveSessionBackup(currentUid, snapshot, { baseRevision: value, unsynced, ...(unanswered?.length ? { unanswered } : {}) })
   }
 
   function saveSessionWithRevision(
@@ -163,7 +163,25 @@ export function useActiveSession(uid: string | null) {
         throw new Error('Active session write superseded.')
       }
       const expectedRevision = revision.value
-      const saved = await saveActiveSession(currentUid, snapshot, expectedRevision)
+      const own = revision.unanswered ?? []
+      let saved: Awaited<ReturnType<typeof saveActiveSession>>
+      try {
+        saved = await saveActiveSession(currentUid, snapshot, expectedRevision, ...(own.length ? [own] : []))
+      } catch (error) {
+        const attempted = attemptedRevisionOf(error)
+        if (attempted) {
+          revision.unanswered = [...(revision.unanswered ?? []), attempted]
+          // Kept with the backup, so a reload or a visit to another tab still knows the write may have landed
+          const stored = readActiveSessionBackupRecord(currentUid)
+          // Only into a backup holding this tab's state: another tab's backup is not ours to annotate
+          if (stored?.session.sessionId === snapshot.sessionId
+            && serializeActiveWorkout(stored.session) === serializeActiveWorkout(useWorkoutStore.getState().active)) {
+            writeActiveSessionBackup(currentUid, stored.session, { baseRevision: stored.baseRevision, unsynced: stored.unsynced, unanswered: revision.unanswered })
+          }
+        }
+        throw error
+      }
+      revision.unanswered = undefined
       const latest = readActiveSessionBackupRecord(currentUid)
       if (latest?.session.sessionId === snapshot.sessionId && latest.baseRevision === expectedRevision
         && serializeActiveWorkout(latest.session) === serializeActiveWorkout(useWorkoutStore.getState().active)) {
@@ -173,7 +191,8 @@ export function useActiveSession(uid: string | null) {
         })
       }
       // Advance only this runtime's lineage; another tab's backup cannot authorize a write.
-      if (revision.value === expectedRevision
+      // The listener may already have moved the base to our own landed write; that is not someone else's
+      if ((revision.value === expectedRevision || (revision.value !== null && own.includes(revision.value)))
         && useWorkoutStore.getState().active?.sessionId === snapshot.sessionId
         && !isConfirmedClosedSessionId(snapshot.sessionId, confirmedClosedSessionIdsRef.current)) {
         revision.value = saved.sessionRevision
@@ -489,7 +508,7 @@ export function useActiveSession(uid: string | null) {
       ? backupAtMount.baseRevision
       : null
     activeSessionRevisionRef.current = sessionSaveQueues.get(`${currentUid}:${mountedSessionId}`)?.revision
-      ?? { value: backupRevision }
+      ?? { value: backupRevision, unanswered: backupAtMount && backupAtMount.session.sessionId === mountedSessionId ? backupAtMount.unanswered : undefined }
     setReady(false)
     staleSessionRef.current = null
     setStaleSession(null)
