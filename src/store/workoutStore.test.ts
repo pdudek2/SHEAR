@@ -53,8 +53,10 @@ describe('workoutStore set steppers', () => {
     useWorkoutStore.setState({ active: null, restTimer: null, restChecked: null, restHandled: null })
     useWorkoutStore.getState().hydrateFromDoc(session)
     expect(useWorkoutStore.getState().restTimer).toBeNull()
-    // Logging the last open set and adding one more does not bring the skipped rest of the first back either
-    expect(useWorkoutStore.getState().restHandled).toMatchObject({ sessionId: session.sessionId })
+    // Removing the open set and adding one does not bring the skipped rest back either
+    useWorkoutStore.getState().removeSet(0, 1)
+    useWorkoutStore.getState().addSet(0)
+    expect(useWorkoutStore.getState().restTimer).toBeNull()
     vi.unstubAllGlobals()
   })
 

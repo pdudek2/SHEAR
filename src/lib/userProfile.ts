@@ -21,11 +21,19 @@ export async function getProfile(uid: string): Promise<UserProfile | null> {
 // working connection would spin for good. Past this the write still lands later; the user is told to retry.
 export const PROFILE_SAVE_TIMEOUT_MS = 15_000
 
+// The write is still queued and lands once the connection answers; only the confirmation is missing.
+export class ProfileSaveNotConfirmedError extends Error {
+  constructor() {
+    super('Profile save not confirmed yet.')
+    this.name = 'ProfileSaveNotConfirmedError'
+  }
+}
+
 async function bounded(write: Promise<void>): Promise<void> {
   let timeout: ReturnType<typeof setTimeout> | undefined
   try {
     await Promise.race([write, new Promise<never>((_, reject) => {
-      timeout = setTimeout(() => reject(new Error('Profile save not confirmed.')), PROFILE_SAVE_TIMEOUT_MS)
+      timeout = setTimeout(() => reject(new ProfileSaveNotConfirmedError()), PROFILE_SAVE_TIMEOUT_MS)
     })])
   } finally {
     clearTimeout(timeout)

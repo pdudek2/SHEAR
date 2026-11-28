@@ -25,8 +25,10 @@ describe('BottomNav on a workout page', () => {
     expect(container.querySelector('nav')).toHaveAttribute('aria-hidden', 'true')
   })
 
-  it('stays hidden on a workout opened from History', () => {
+  it('stays hidden on a workout opened from History, and on a malformed address', () => {
     const { container } = renderAt(['/workout/saved-1'])
     expect(container.querySelector('nav')).toHaveAttribute('aria-hidden', 'true')
+    const malformed = renderAt([{ pathname: '/workout/%E0%A4%A', state: savedWorkoutEntry({ workoutId: 'saved-1', status: 'materialized' }) }])
+    expect(malformed.container.querySelector('nav')).toHaveAttribute('aria-hidden', 'true')
   })
 })

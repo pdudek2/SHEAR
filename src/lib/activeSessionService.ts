@@ -141,6 +141,8 @@ export async function persistTemplateLaunchSession(
 
   await runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(ref)
+    // The SDK re-runs the function after a lost commit answer; finding this call's own write means it landed
+    if (snapshot.exists() && readSessionRevision(snapshot.data()) === sessionRevision) return
     if (!replaceExisting && snapshot.exists() && sessionDocumentHasWork(snapshot.data())) {
       throw new TemplateLaunchConflictError()
     }

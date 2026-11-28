@@ -56,6 +56,8 @@ const workout: ActiveWorkout = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  transactionGet.mockReset()
+  transactionSet.mockReset()
   vi.mocked(doc).mockReturnValue(sessionRef as never)
   vi.spyOn(Date, 'now').mockReturnValue(999)
   snapshotHandler = undefined
@@ -126,6 +128,19 @@ describe('persistTemplateLaunchSession', () => {
 
     await expect(persistence).rejects.toBeInstanceOf(TemplateLaunchConflictError)
     expect(transactionSet).not.toHaveBeenCalled()
+  })
+
+  it('treats finding its own launch on the SDK\'s retry as success, not as someone else\'s work', async () => {
+    let stored: Record<string, unknown> | undefined
+    transactionGet.mockImplementation(async () => sessionSnapshot(stored))
+    transactionSet.mockImplementation((_ref, document: Record<string, unknown>) => { stored = document })
+    vi.mocked(runTransaction).mockImplementationOnce(async (_db, update) => {
+      await update({ get: transactionGet, set: transactionSet } as never)
+      return update({ get: transactionGet, set: vi.fn() } as never)
+    })
+
+    const revision = await persistTemplateLaunchSession('user-1', workout, false)
+    expect(revision).toBe(stored?.sessionRevision)
   })
 
   it('writes when replacement is explicitly allowed despite remote work', async () => {
@@ -221,8 +236,6 @@ describe('saveActiveSession', () => {
     const saved = await saveActiveSession('user-1', workout, 'revision-known')
     expect(saved.sessionRevision).toBe(stored)
     expect(stored).not.toBe('revision-known')
-    transactionGet.mockReset()
-    transactionSet.mockReset()
   })
 
   it('rejects a stale revision without writing', async () => {

@@ -225,7 +225,7 @@ export default function WorkoutDetailPage() {
   }
   useEffect(() => {
     if (!workoutResult) return
-    // The result is shown once, but the page stays Train's until the user leaves it.
+    // Stamped with this page load, so after a reload the page is the plain history view
     navigate(location.pathname, { replace: true, state: savedWorkoutEntry(workoutResult) })
   }, [location.pathname, navigate, workoutResult])
   const deleteScopeRef = useRef<object | null>(null)

@@ -232,6 +232,7 @@ describe('WorkoutPage stale-session feedback', () => {
     mocks.storeUid = undefined
     mocks.toastError.mockReset()
     mocks.toastSuccess.mockReset()
+    mocks.toastDismiss.mockReset()
     mocks.uid = 'user-1'
   })
 
@@ -544,9 +545,12 @@ describe('WorkoutPage stale-session feedback', () => {
     }
   })
 
-  it('closes an open log question when the workout page goes away', () => {
+  it('closes an open log question when a finish starts and when the workout page goes away', () => {
+    const { rerender, unmount } = renderStaleSessionPage()
     mocks.toastDismiss.mockClear()
-    const { unmount } = renderStaleSessionPage()
+    mocks.closureState = 'submitting'
+    rerender(createElement(MemoryRouter, null, createElement(WorkoutPage)))
+    expect(mocks.toastDismiss).toHaveBeenCalledWith('log-without-weight')
     mocks.toastDismiss.mockClear()
     unmount()
     expect(mocks.toastDismiss).toHaveBeenCalledWith('log-without-weight')

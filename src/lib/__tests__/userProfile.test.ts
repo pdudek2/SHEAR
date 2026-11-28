@@ -9,7 +9,7 @@ vi.mock('firebase/firestore', () => ({
 }))
 
 import { setDoc, updateDoc } from 'firebase/firestore'
-import { PROFILE_SAVE_TIMEOUT_MS, saveProfile, updateProfile } from '../userProfile'
+import { PROFILE_SAVE_TIMEOUT_MS, ProfileSaveNotConfirmedError, saveProfile, updateProfile } from '../userProfile'
 
 describe('profile saves', () => {
   afterEach(() => { vi.useRealTimers() })
@@ -19,8 +19,8 @@ describe('profile saves', () => {
     vi.mocked(updateDoc).mockReturnValue(new Promise(() => undefined))
     vi.mocked(setDoc).mockReturnValue(new Promise(() => undefined))
 
-    const update = expect(updateProfile('user-1', { displayName: 'Alex' })).rejects.toThrow()
-    const save = expect(saveProfile('user-1', { displayName: 'Alex', weeklyGoal: 3, primaryGoal: 'strength', units: 'kg', createdAt: 1 })).rejects.toThrow()
+    const update = expect(updateProfile('user-1', { displayName: 'Alex' })).rejects.toBeInstanceOf(ProfileSaveNotConfirmedError)
+    const save = expect(saveProfile('user-1', { displayName: 'Alex', weeklyGoal: 3, primaryGoal: 'strength', units: 'kg', createdAt: 1 })).rejects.toBeInstanceOf(ProfileSaveNotConfirmedError)
     await vi.advanceTimersByTimeAsync(PROFILE_SAVE_TIMEOUT_MS)
     await update
     await save

@@ -9,7 +9,7 @@ import { FEEDBACK_EMAIL, feedbackMailto } from '../shared/feedbackMail'
 import { useEffect, useState } from 'react'
 import type * as React from 'react'
 import { toast } from 'sonner'
-import { updateProfile, type PrimaryGoal, type Units } from '../lib/userProfile'
+import { ProfileSaveNotConfirmedError, updateProfile, type PrimaryGoal, type Units } from '../lib/userProfile'
 import { useProfileStore } from '../store/profileStore'
 import { useAuthStore } from '../store/authStore'
 import { Button, Input } from '../components/ui'
@@ -97,7 +97,10 @@ export default function ProfilePage() {
     setSaving(true)
     const updated = { displayName: displayName.trim(), primaryGoal, weeklyGoal, units }
     try {
-      await updateProfile(user.uid, updated)
+      await updateProfile(user.uid, updated).catch((error: unknown) => {
+        // Firestore keeps the queued write and sends it once connected, so this counts as saved
+        if (!(error instanceof ProfileSaveNotConfirmedError)) throw error
+      })
       setProfile(user.uid, { ...profile, ...updated })
       toast.success('Profile saved')
     } catch {

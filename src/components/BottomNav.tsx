@@ -49,7 +49,7 @@ export default function BottomNav() {
   const workoutActive = path.startsWith('/workout/new')
   const workoutDetail = path.startsWith('/workout/') && !workoutActive
   // The page that follows Finish belongs to Train and keeps the tabs; other workout pages hide them.
-  const savedWorkout = workoutDetail && readWorkoutResult(location.state, decodeURIComponent(path.slice('/workout/'.length))) !== null
+  const savedWorkout = workoutDetail && readWorkoutResult(location.state, decodePathPart(path.slice('/workout/'.length))) !== null
   const go = (to: string) => navigateWithAppTransition(navigate, to)
 
   // With no session /workout/new is a resting page, so the bar stays as the way out.
@@ -107,4 +107,12 @@ export default function BottomNav() {
       </div>
     </nav>
   )
+}
+
+function decodePathPart(part: string): string | undefined {
+  try {
+    return decodeURIComponent(part)
+  } catch {
+    return undefined
+  }
 }

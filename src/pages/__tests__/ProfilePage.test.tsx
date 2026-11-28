@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   updateProfile: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
+  NotConfirmed: class extends Error {},
 }))
 
 vi.mock('../../store/authStore', () => ({
@@ -33,6 +34,7 @@ vi.mock('../../store/profileStore', () => ({
 
 vi.mock('../../lib/userProfile', () => ({
   updateProfile: mocks.updateProfile,
+  ProfileSaveNotConfirmedError: mocks.NotConfirmed,
 }))
 
 vi.mock('sonner', () => ({
@@ -120,6 +122,19 @@ describe('ProfilePage hierarchy and settings', () => {
       expect(mocks.toastError).toHaveBeenCalledWith('Could not save. Try again.')
     })
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+  })
 
+  it('counts a save still queued after the timeout as saved', async () => {
+    mocks.updateProfile.mockRejectedValueOnce(new mocks.NotConfirmed())
+    render(<ProfilePage />, { wrapper: MemoryRouter })
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Jana' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => {
+      expect(mocks.toastSuccess).toHaveBeenCalledWith('Profile saved')
+    })
+    expect(mocks.setProfile).toHaveBeenCalledWith('user-1', expect.objectContaining({ displayName: 'Jana' }))
+    expect(mocks.toastError).not.toHaveBeenCalled()
   })
 })

@@ -245,9 +245,9 @@ export default function WorkoutPage() {
     mountedRef.current = true
     return () => { mountedRef.current = false }
   }, [])
-  // Leaving the page, finishing or another session taking over ends any open log question
+  // Leaving the page, a finish or discard starting, or another session taking over ends any open log question
   const activeSessionId = active?.sessionId
-  useEffect(() => () => dismissLogQuestions(), [activeSessionId])
+  useEffect(() => () => dismissLogQuestions(), [activeSessionId, closureState])
   const [showPicker, setShowPicker] = useState(false)
   const [closureRejection, setClosureRejection] = useState<string | null>(null)
   const addExerciseRef = useRef<HTMLButtonElement>(null)

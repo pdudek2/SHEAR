@@ -173,7 +173,9 @@ export function useActiveSession(uid: string | null) {
           revision.unanswered = [...(revision.unanswered ?? []), attempted]
           // Kept with the backup, so a reload or a visit to another tab still knows the write may have landed
           const stored = readActiveSessionBackupRecord(currentUid)
-          if (stored?.session.sessionId === snapshot.sessionId) {
+          // Only into a backup holding this tab's state: another tab's backup is not ours to annotate
+          if (stored?.session.sessionId === snapshot.sessionId
+            && serializeActiveWorkout(stored.session) === serializeActiveWorkout(useWorkoutStore.getState().active)) {
             writeActiveSessionBackup(currentUid, stored.session, { baseRevision: stored.baseRevision, unsynced: stored.unsynced, unanswered: revision.unanswered })
           }
         }

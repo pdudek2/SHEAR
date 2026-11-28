@@ -314,6 +314,10 @@ describe('useActiveSession snapshot authority', () => {
     expect(readActiveSessionBackupRecord('user-1')?.unanswered).toHaveLength(6)
 
     first.unmount()
+    // Let the last write settle, so the remount cannot reuse the in-memory lineage and must read the backup
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    const stored = readActiveSessionBackupRecord('user-1')!
+    writeActiveSessionBackup('user-1', stored.session, { baseRevision: stored.baseRevision, unsynced: stored.unsynced, unanswered: [...stored.unanswered!, 'revision-from-backup'] })
     saveActiveSession.mockReset().mockResolvedValue({ sessionRevision: 'revision-after-remount' })
     renderHook(() => useActiveSession('user-1'))
     // The server holds the write whose answer was lost
@@ -323,7 +327,30 @@ describe('useActiveSession snapshot authority', () => {
     act(() => useWorkoutStore.getState().updateSet(0, 0, 'reps', '12'))
     await act(async () => { await vi.advanceTimersByTimeAsync(400) })
     // The first save after the remount still carries them; a success then clears them
-    expect(saveActiveSession.mock.calls[0]?.[3]).toHaveLength(6)
+    expect(saveActiveSession.mock.calls[0]?.[3]).toEqual([...stored.unanswered!, 'revision-from-backup'])
+    expect(readActiveSessionBackupRecord('user-1')?.unanswered).toBeUndefined()
+    consoleError.mockRestore()
+  })
+
+  it('does not write its unanswered saves into another tab\'s backup', async () => {
+    vi.useFakeTimers()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    renderHook(() => useActiveSession('user-1'))
+    act(() => listener.current?.({
+      session: editableRemoteSession, sessionRevision: 'revision-initial', fromCache: false, hasPendingWrites: false,
+    }))
+    const pending = createDeferred<{ sessionRevision: string }>()
+    saveActiveSession.mockImplementationOnce(() => pending.promise)
+    act(() => useWorkoutStore.getState().updateSet(0, 0, 'reps', '7'))
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    // Meanwhile another tab writes its own state into the shared backup
+    const otherTab = { ...editableRemoteSession, exercises: [{ ...editableRemoteSession.exercises[0]!, sets: [{ weight: '90', reps: '3', done: false }] }] }
+    writeActiveSessionBackup('user-1', otherTab, { baseRevision: 'revision-other-tab', unsynced: true })
+    await act(async () => {
+      pending.reject(new Error('offline'))
+      await Promise.resolve()
+    })
+    expect(readActiveSessionBackupRecord('user-1')).toMatchObject({ baseRevision: 'revision-other-tab', session: { exercises: [{ sets: [{ reps: '3' }] }] } })
     expect(readActiveSessionBackupRecord('user-1')?.unanswered).toBeUndefined()
     consoleError.mockRestore()
   })
