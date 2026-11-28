@@ -50,7 +50,7 @@ export function newPlanDraft(draftId: string, units: WeightUnits, template: Work
       return { ...exercise, rowId: newId(), sets: String(exercise.sets), targetReps: String(exercise.targetReps),
         weight, originalWeightKg: exercise.targetWeight, originalWeightDisplay: weight }
     }),
-  })) : [{ rowId: newId(), dayId: newPlanDayId(), name: 'Day 1', exercises: [] }]
+  })) : [{ rowId: newId(), dayId: newPlanDayId(), name: '', exercises: [] }]
   return {
     draftId, revision: 0, targetId: template?.id ?? null, baseline: template ? templateFingerprint(template) : null,
     units, name: template?.name ?? '', days, selectedDayId: days[0]!.rowId, pending: null, resolvedId: null, dirty: false,

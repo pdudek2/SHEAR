@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   muted: { color: colors.muted, fontFamily: 'InstrumentSans_400Regular', fontSize: 13, lineHeight: 19 },
   retry: { minHeight: 44, justifyContent: 'center' }, actionText: { color: colors.accentText, fontFamily: 'InstrumentSans_700Bold', fontSize: 13 },
   cacheRow: { alignItems: 'flex-start', gap: 4, paddingTop: 14 },
-  cover: { height: 248, marginTop: -26.4, marginHorizontal: -16, overflow: 'hidden' },
+  cover: { height: 188, marginTop: -26.4, marginHorizontal: -16, overflow: 'hidden' },
   coverSeam: { position: 'absolute', left: 16, right: 16, bottom: 0, height: 2.5, backgroundColor: colors.seam },
   record: { color: colors.text, fontFamily: 'InstrumentSans_600SemiBold', fontSize: 14, marginBottom: 4 },
   coverFade: { ...StyleSheet.absoluteFill, experimental_backgroundImage: `linear-gradient(180deg, transparent 40%, ${colors.background}b8 72%, ${colors.background} 100%)` },

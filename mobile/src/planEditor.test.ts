@@ -20,6 +20,8 @@ test('normalizes source identity and refuses malformed numeric input', () => {
   assert.equal(request.days[0]!.exercises[0]!.targetWeight, 100.0171)
   assert.equal(request.days[0]!.exercises[1]!.targetWeight, 0, 'an empty weight field saves as no starting weight')
   assert.equal(request.name, 'Day split')
+  assert.equal(draft.days[0]!.name, '', 'a new day starts unnamed, with "Day 1" only as a placeholder')
+  assert.equal(request.days[0]!.name, 'Day 1', 'an unnamed day saves as Day N')
   draft.days[0]!.exercises[0]!.weight = '220lbs'
   assert.throws(() => normalizePlanDraft(draft, 'operation-1'), /weight/)
   draft.days[0]!.exercises[0]!.weight = '0'
