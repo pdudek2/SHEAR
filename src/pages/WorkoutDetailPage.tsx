@@ -37,6 +37,7 @@ import { selectOnRetap } from '../components/workout/sessionHelpers'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import { ActionFeedback } from '../components/ActionFeedback'
+import { pluralize } from '../lib/pluralize'
 import { WorkoutDetailMobileActions } from '../components/WorkoutDetailMobileActions'
 import WorkoutProjectionStatus, {
   type ProjectionRetryState,
@@ -745,11 +746,11 @@ export default function WorkoutDetailPage() {
             </div>
           )}
           <div>
-            <dt>Sets</dt>
+            <dt>{pluralize(totalSets, 'Set', 'Sets')}</dt>
             <dd>{totalSets}</dd>
           </div>
           <div>
-            <dt aria-label="Reps">Reps</dt>
+            <dt aria-label={pluralize(totalReps, 'Rep', 'Reps')}>{pluralize(totalReps, 'Rep', 'Reps')}</dt>
             <dd>{totalReps}</dd>
           </div>
           <div>

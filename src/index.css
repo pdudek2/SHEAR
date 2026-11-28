@@ -4453,7 +4453,7 @@ button.progress-exercise-row:hover .progress-exercise-name {
   border: 0;
   background: transparent;
   padding-inline: 0.25rem;
-  color: var(--muted);
+  color: var(--text-strong);
 }
 
 .template-day-add-exercise.planner-secondary-action:hover {
@@ -8175,7 +8175,8 @@ body:has(.bottom-nav[aria-hidden="true"]) .workout-detail-mobile-actions {
 
 .train-cover {
   position: relative;
-  height: 15.5rem;
+  /* Low enough that "This week" and its day row clear the Start dock on a 390 × 844 phone */
+  height: 11.75rem;
   margin: -1.625rem -1rem 0;
   overflow: hidden;
 }

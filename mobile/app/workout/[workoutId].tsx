@@ -23,6 +23,7 @@ import { Icon } from '../../src/icons'
 import { WorkoutSteps } from '../../src/WorkoutSteps'
 import { BottomSheet } from '../../src/BottomSheet'
 import BottomNavigation, { plateRow } from '../../src/BottomNavigation'
+import { pluralize } from '../../../src/lib/pluralize'
 
 export default function SavedWorkoutScreen() {
   const { workoutId: routeId, saved, from } = useLocalSearchParams<{ workoutId: string; saved?: string; from?: string }>()
@@ -131,8 +132,8 @@ export default function SavedWorkoutScreen() {
 
           <View accessibilityLabel="Workout summary" style={styles.facts}>
             {hasRecordedDuration(workout.startedAt, workout.finishedAt) && <SummaryFact label="Time" value={formatWorkoutDuration(workout.startedAt, workout.finishedAt)} />}
-            <SummaryFact label="Sets" value={String(totalSets)} />
-            <SummaryFact label="Reps" value={String(totalReps)} />
+            <SummaryFact label={pluralize(totalSets, 'Set', 'Sets')} value={String(totalSets)} />
+            <SummaryFact label={pluralize(totalReps, 'Rep', 'Reps')} value={String(totalReps)} />
             <SummaryFact label="Volume" value={formatCompactVolume(volume, active.state.units)} />
           </View>
 
