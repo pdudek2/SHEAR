@@ -59,11 +59,12 @@ function pastedDays(plan: ImportedPlan): DraftDay[] {
   }))
 }
 
-function emptyDay(index: number): DraftDay {
+function emptyDay(): DraftDay {
   return {
     _id: crypto.randomUUID(),
     id: newPlanDayId(),
-    name: `Day ${index + 1}`,
+    // Left empty: "Day N" stays a placeholder, so typing a name does not end up as "Day 1 - Push"
+    name: '',
     exercises: [],
   }
 }
@@ -99,7 +100,7 @@ function serializeDraftState(name: string, days: Array<{ name: string; exercises
 }
 
 function defaultSerializableDays(): TemplateDay[] {
-  return [{ name: 'Day 1', exercises: [] }]
+  return [{ name: '', exercises: [] }]
 }
 
 function normalizeTemplateExercise(exercise: DraftExercise): TemplateExercise {
@@ -172,7 +173,7 @@ export default function TemplateEditorPage() {
   const [days, setDays] = useState<DraftDay[]>(() => (
     pasted ? pastedDays(pasted) : initialDraft?.days.length
       ? initialDraft.days.map((day) => ({ ...day, _id: crypto.randomUUID() }))
-      : [emptyDay(0)]
+      : [emptyDay()]
   ))
   const [selectedDayId, setSelectedDayId] = useState(() => days[0]._id)
   const [pickerDayIndex, setPickerDayIndex] = useState<number | null>(null)
@@ -207,7 +208,7 @@ export default function TemplateEditorPage() {
         setName(nextTemplate.name)
         const loadedDays = nextTemplate.days.length
           ? nextTemplate.days.map((day) => ({ ...day, _id: crypto.randomUUID() }))
-          : [emptyDay(0)]
+          : [emptyDay()]
 
         setDays(loadedDays)
         setSelectedDayId(loadedDays[0]._id)
@@ -281,7 +282,7 @@ export default function TemplateEditorPage() {
   }
 
   function addDay() {
-    const nextDay = emptyDay(days.length)
+    const nextDay = emptyDay()
     setDays((prev) => [...prev, nextDay])
     setSelectedDayId(nextDay._id)
   }
@@ -581,6 +582,7 @@ export default function TemplateEditorPage() {
                       id={`template-day-name-${selectedDay._id}`}
                       type="text"
                       maxLength={80}
+                      placeholder={`Day ${selectedDayIndex + 1}`}
                       value={selectedDay.name}
                       onChange={(event) => updateDay(selectedDayIndex, {
                         ...selectedDay,

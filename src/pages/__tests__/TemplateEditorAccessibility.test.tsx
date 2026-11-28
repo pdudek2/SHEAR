@@ -316,7 +316,10 @@ describe('TemplateEditorPage accessibility', () => {
     expect(tabs).toHaveLength(2)
     expect(tabs[0]).toHaveAttribute('aria-selected', 'false')
     expect(tabs[1]).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('textbox', { name: 'Day name 2' })).toHaveValue('Day 2')
+    // Unnamed, with "Day 2" as a placeholder and as the tab's label, so a typed name is not appended to it
+    expect(screen.getByRole('textbox', { name: 'Day name 2' })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: 'Day name 2' })).toHaveAttribute('placeholder', 'Day 2')
+    expect(tabs[1]).toHaveTextContent('Day 2')
   })
 
   it('selects the next neighbor when the selected day is removed', async () => {
